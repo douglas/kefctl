@@ -72,14 +72,16 @@ Typed async HTTP client wrapping the KEF speaker's REST API. All methods return 
 | `/api/getData` | GET/POST | Read speaker state (source, volume, settings, player data) |
 | `/api/setData` | POST | Write speaker state (change source, volume, settings) |
 | `/api/getRows` | GET | Read list data (DSP params, group members) |
-| `/api/event/pollQueue` | GET | Long-poll for real-time state changes |
+| `/api/event/modifyQueue` | GET | Register/unsubscribe event subscriptions, returns queueId |
+| `/api/event/pollQueue` | GET | Long-poll for real-time state changes (requires queueId from modifyQueue) |
 
 **API paths (from KEF HTTP API):**
 
 - `player:volume` — current volume (i32, 0–100)
 - `player:player/data` — now playing info (artist, track, duration, position)
 - `player:player/data/playTime` — playback position
-- `settings:/kef/play/physicalSource` — active source (usb, wifi, bluetooth, tv, optic, coaxial, analog)
+- `player:player/control` — playback control (play, pause, next, previous, seekTime)
+- `settings:/kef/play/physicalSource` — active source (usb, wifi, bluetooth, tv, optical, coaxial, analog, standby)
 - `settings:/kef/host/speakerStatus` — powerOn or standby
 - `settings:/kef/host/cableMode` — wired or wireless
 - `settings:/kef/host/maximumVolume` — max volume limit
@@ -91,12 +93,30 @@ Typed async HTTP client wrapping the KEF speaker's REST API. All methods return 
 - `settings:/deviceName` — speaker name
 - `settings:/releasetext` — firmware version
 - `settings:/system/primaryMacAddress` — MAC address
-- `kef:eqProfile/v2` — active EQ profile
-- DSP params via `getRows`
+- `kef:eqProfile/v2` — active EQ profile and DSP parameters
+
+**Request/Response Formats:**
+
+`getData` uses query params: `GET /api/getData?path=settings%3A%2Fkef%2Fhost%2FcableMode&roles=value`
+Returns: `[{"kefCableMode": "wired", "type": "kefCableMode"}]`
+
+`setData` uses POST with typed value wrappers:
+```json
+{
+  "path": "player:volume",
+  "roles": "value",
+  "value": { "type": "i32_", "i32_": 50 }
+}
+```
+Value types: `i32_`, `i64_`, `string_`, `bool_`, `kefPhysicalSource`, `kefSpeakerStatus`, `kefCableMode`
+
+**Event registration flow:**
+1. `GET /api/event/modifyQueue?subscribe=[paths]&queueId=` → returns `{"queueId": "<uuid>"}`
+2. `GET /api/event/pollQueue?queueId=<uuid>&timeout=5000` → returns changed values or empty on timeout
 
 ### 2. `discovery` — mDNS Speaker Discovery
 
-Uses `mdns-sd` crate to browse for `_kef._tcp.local` services. Returns list of `(name, ip, port)` tuples. Times out after 5 seconds.
+Uses `mdns-sd` crate to browse for `_http._tcp.local.` services, filtering results to identify KEF speakers by device name or TXT records. Returns list of `(name, ip, port)` tuples. Times out after 5 seconds.
 
 Falls back to `~/.config/kefctl/config.toml` if no speakers found or if a static IP is configured.
 
@@ -109,7 +129,7 @@ struct App {
     connection: ConnectionState, // Connected / Disconnected / Connecting
     // Per-panel state
     source_list: ListState,     // Source selector cursor
-    eq_focus: EqFocus,          // Which EQ band is focused
+    eq_focus: usize,            // Which EQ parameter row is focused
     settings_focus: usize,      // Which setting row is focused
     network_speakers: Vec<Speaker>, // Discovered speakers
 }
@@ -124,16 +144,16 @@ enum Panel {
 
 struct SpeakerState {
     name: String,
-    model: String,
+    model: String,              // Derived from device name or mDNS metadata
     firmware: String,
     ip: IpAddr,
     mac: String,
     source: Source,
-    volume: u8,
+    volume: i32,            // API returns i32, clamped to 0..=max_volume
     muted: bool,
     cable_mode: CableMode,
     standby_mode: StandbyMode,
-    max_volume: u8,
+    max_volume: i32,
     front_led: bool,
     startup_tone: bool,
     eq_profile: String,
@@ -156,7 +176,7 @@ struct SpeakerState {
 
 - **Status** — Speaker info block, now playing with progress bar and playback controls, key settings summary
 - **Source** — Selectable list of sources, active source marked, Enter to switch
-- **EQ** — Horizontal gauge bars for bass/mid/treble, profile selector row, ←/→ to adjust focused band
+- **EQ** — Profile selector, treble dB adjustment, bass extension (less/standard/more), desk mode toggle + dB, wall mode toggle + dB, subwoofer settings (gain/polarity/crossover). Arrow keys to navigate and adjust values.
 - **Settings** — Grouped settings with inline cycling (◂ ▸), Enter to confirm changes
 - **Network** — Discovered speakers list, connection status, manual IP entry
 
@@ -168,8 +188,10 @@ struct SpeakerState {
 | `Tab` / `Shift+Tab` | Next/prev sidebar panel |
 | `j` / `↓` | Move down in list |
 | `k` / `↑` | Move up in list |
-| `h` / `←` | Focus sidebar / decrease value |
-| `l` / `→` | Focus main panel / increase value |
+| `h` | Focus sidebar (from main panel) |
+| `l` | Focus main panel (from sidebar) |
+| `←` / `→` | Decrease / increase value (when editing a control) |
+| `Esc` | Cancel edit / return to sidebar |
 | `Enter` | Select / confirm |
 | `m` | Toggle mute |
 | `+` / `-` | Volume up / down |
@@ -182,7 +204,7 @@ struct SpeakerState {
 Merges two async streams:
 
 1. **Terminal events** — `crossterm::event::EventStream`, key presses and resize
-2. **Speaker events** — long-poll `/api/event/pollQueue` with 30s timeout, reconnect on failure
+2. **Speaker events** — register via `/api/event/modifyQueue` then long-poll `/api/event/pollQueue` with 5s timeout, reconnect on failure
 
 Uses `tokio::select!` to process whichever fires first. Terminal events trigger state transitions and API calls. Speaker events update `SpeakerState` and trigger re-render.
 
@@ -232,7 +254,8 @@ Tick Timer    ──→ increment playback position ──→ re-render progress
 3. `app.speaker.volume = min(volume + 1, max_volume)` (optimistic)
 4. Spawn `kef_api.set_volume(new_volume)` task
 5. UI re-renders with new volume
-6. Next poll event confirms the value (or corrects if API failed)
+6. If API call fails: revert optimistic update, show inline error notification (auto-dismiss 3s)
+7. Otherwise, next poll event confirms the value
 
 ## Error Handling
 
