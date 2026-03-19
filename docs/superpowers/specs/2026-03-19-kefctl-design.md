@@ -63,6 +63,16 @@ src/
 
 Typed async HTTP client wrapping the KEF speaker's REST API. All methods return `Result<T, KefError>`.
 
+```rust
+enum KefError {
+    Network(reqwest::Error),
+    Api { status: u16, message: String },
+    Timeout,
+    Discovery(String),
+    Config(toml::de::Error),
+}
+```
+
 **Base URL:** `http://<speaker-ip>/api/`
 
 **Core endpoints used:**
@@ -71,7 +81,7 @@ Typed async HTTP client wrapping the KEF speaker's REST API. All methods return 
 |----------|--------|---------|
 | `/api/getData` | GET/POST | Read speaker state (source, volume, settings, player data) |
 | `/api/setData` | POST | Write speaker state (change source, volume, settings) |
-| `/api/getRows` | GET | Read list data (DSP params, group members) |
+| `/api/getRows` | GET | Read list data (group members — v2 only, not used in v1) |
 | `/api/event/modifyQueue` | GET | Register/unsubscribe event subscriptions, returns queueId |
 | `/api/event/pollQueue` | GET | Long-poll for real-time state changes (requires queueId from modifyQueue) |
 
@@ -116,7 +126,7 @@ Value types: `i32_`, `i64_`, `string_`, `bool_`, `kefPhysicalSource`, `kefSpeake
 
 ### 2. `discovery` — mDNS Speaker Discovery
 
-Uses `mdns-sd` crate to browse for `_http._tcp.local.` services, filtering results to identify KEF speakers by device name or TXT records. Returns list of `(name, ip, port)` tuples. Times out after 5 seconds.
+Uses `mdns-sd` crate to browse for `_http._tcp.local.` services, filtering results where the service name contains "KEF" (case-insensitive). The exact filter heuristic may need refinement during implementation by inspecting mDNS TXT records on a live network. Returns list of `(name, ip, port)` tuples. Times out after 5 seconds.
 
 Falls back to `~/.config/kefctl/config.toml` if no speakers found or if a static IP is configured.
 
@@ -144,7 +154,7 @@ enum Panel {
 
 struct SpeakerState {
     name: String,
-    model: String,              // Derived from device name or mDNS metadata
+    model: String,              // Parsed from settings:/deviceName (e.g., "LSX II" from "LSX II")
     firmware: String,
     ip: IpAddr,
     mac: String,
@@ -198,6 +208,7 @@ struct SpeakerState {
 | `Space` | Play / pause |
 | `n` | Next track |
 | `p` | Previous track |
+| `f` / `b` | Seek forward / backward 10s |
 
 ### 5. `event` — Event Loop
 
@@ -208,7 +219,11 @@ Merges two async streams:
 
 Uses `tokio::select!` to process whichever fires first. Terminal events trigger state transitions and API calls. Speaker events update `SpeakerState` and trigger re-render.
 
-Tick timer (1s) updates playback progress bar between poll events.
+Tick timer (1s) updates playback progress bar between poll events. Poll events with `player:player/data/playTime` are authoritative and always overwrite the locally-ticked position.
+
+**Event subscriptions:** Register for `player:volume`, `player:player/data`, `settings:/kef/play/physicalSource`, `settings:/kef/host/speakerStatus`, `settings:/mediaPlayer/mute`, `settings:/kef/host/cableMode`.
+
+**Shutdown:** On quit, drop the connection. The speaker cleans up stale event subscriptions automatically.
 
 ### 6. `config` — Configuration
 
@@ -252,7 +267,7 @@ Tick Timer    ──→ increment playback position ──→ re-render progress
 1. User presses `+`
 2. Event loop matches to `Action::VolumeUp`
 3. `app.speaker.volume = min(volume + 1, max_volume)` (optimistic)
-4. Spawn `kef_api.set_volume(new_volume)` task
+4. Spawn `kef_api.set_volume(new_volume)` task (rapid presses debounced: coalesce within 50ms, cancel in-flight request for same path)
 5. UI re-renders with new volume
 6. If API call fails: revert optimistic update, show inline error notification (auto-dismiss 3s)
 7. Otherwise, next poll event confirms the value
@@ -292,6 +307,8 @@ kefctl volume 50             # Set volume and exit (scriptable)
 ```
 
 Non-interactive commands (`discover`, `status`, `source`, `volume`) enable scripting and integration with other tools (e.g., keybindings, waybar modules).
+
+Non-interactive commands resolve the speaker using: `--speaker` flag > config file IP > mDNS discovery. If mDNS finds multiple speakers and no `--speaker`/config is set, exit with error listing discovered speakers.
 
 ## Success Criteria
 
