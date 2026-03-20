@@ -21,7 +21,22 @@ All notable changes to kefctl will be documented in this file.
 - `KefError::Config` variant for TOML parse errors
 - `kef_api/paths.rs` — API path string constants (replaces magic strings)
 - `theme.info_row()` and `theme.section_block()` UI helpers
-- 41 new tests (48 → 89): app state machine, UI rendering (TestBackend), error Display formats, API extraction, EqProfile serde, I64 roundtrip, config parsing
+- 51 new tests (48 → 99): app state machine, UI rendering (TestBackend), error Display formats, API extraction, EqProfile serde, I64 roundtrip, config parsing, insta snapshot tests for all panels
+- `#![deny(unsafe_code)]` — no unsafe in the codebase
+- `#[must_use]` on `handle_key()` to prevent dropped actions
+- Cross-platform `KeyEventKind::Press` filter in event handler
+- All `pub` items tightened to `pub(crate)` (single-binary crate)
+- Module-level `//!` doc comments on all 25 `.rs` files
+- `rust-version = "1.86.0"` MSRV in Cargo.toml
+- `ValueEnum` for CLI source argument (replaces manual string matching)
+- `KEFCTL_LOG` environment variable for runtime log level control via `EnvFilter`
+- `#[tracing::instrument]` spans on key async API methods
+- 2-second `connect_timeout` on reqwest clients for faster failure detection
+- `insta` dev-dependency for visual regression snapshot tests
+- `cargo doc --no-deps` step in CI
+- Cargo.toml metadata: `license`, `repository`, `keywords`, `categories`
+- Partial Omarchy theme loading — missing colors fall back to defaults instead of failing entirely
+- Extracted keybinding hint constants (`HINT_ADJUST`, `HINT_CYCLE`) in UI module
 
 ## [0.1.0] — 2026-03-20
 

@@ -170,7 +170,7 @@ chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
 git clone https://github.com/douglas/kefctl.git
 cd kefctl
 cargo run -- --demo        # No speaker needed
-cargo test                 # Run 89 tests (app state, UI rendering, types, API, errors, config)
+cargo test                 # Run 99 tests (app state, UI rendering, types, API, errors, config, snapshots)
 cargo clippy               # Lint
 ```
 
