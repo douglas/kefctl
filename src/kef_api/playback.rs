@@ -1,3 +1,5 @@
+//! Playback control: play, pause, next, previous, seek.
+
 use crate::error::KefError;
 use super::KefClient;
 use super::paths;

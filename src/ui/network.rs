@@ -1,3 +1,5 @@
+//! Network panel: connection status + discovered speakers.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

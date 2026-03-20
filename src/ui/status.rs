@@ -1,3 +1,5 @@
+//! Status panel: speaker info, now playing, progress bar.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

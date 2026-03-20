@@ -1,3 +1,5 @@
+//! Top-level UI layout: sidebar + main panel, footer, notification overlay.
+
 mod eq;
 mod help;
 mod network;

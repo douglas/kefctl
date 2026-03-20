@@ -2,6 +2,7 @@
 name = "kefctl"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.86.0"
 description = "TUI controller for KEF LSX II speakers"
 
 [dependencies]

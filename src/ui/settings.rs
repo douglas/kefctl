@@ -1,3 +1,5 @@
+//! Settings editor panel: cable mode, standby, max volume, LED, startup tone.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

@@ -1,3 +1,5 @@
+//! EQ/DSP parameter editor panel.
+
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},

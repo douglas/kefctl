@@ -1,3 +1,5 @@
+//! Sidebar panel navigation list.
+
 use ratatui::{
     Frame,
     layout::Rect,

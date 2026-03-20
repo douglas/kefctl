@@ -1,3 +1,5 @@
+//! Floating keybindings overlay (press `?`).
+
 use ratatui::{
     Frame,
     layout::{Constraint, Flex, Layout, Rect},

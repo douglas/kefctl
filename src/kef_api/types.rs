@@ -1,3 +1,5 @@
+//! API types: `ApiValue` tagged union, `Source`, `EqProfile`, domain enums.
+
 use serde::{Deserialize, Serialize};
 
 // ---------- Source ----------

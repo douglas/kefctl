@@ -1,3 +1,5 @@
+//! CLI argument parsing (clap derive).
+
 use clap::{Parser, Subcommand};
 
 /// KEF LSX II TUI Controller

@@ -1,3 +1,5 @@
+//! `KefError` enum — network, API, type mismatch, discovery, config.
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]

@@ -1,3 +1,5 @@
+//! Source get/set.
+
 use crate::error::KefError;
 use super::KefClient;
 use super::paths;

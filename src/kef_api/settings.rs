@@ -1,3 +1,5 @@
+//! Device settings: cable mode, standby, LED, startup tone.
+
 use crate::error::KefError;
 use super::KefClient;
 use super::paths;

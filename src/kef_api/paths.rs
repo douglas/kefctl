@@ -1,3 +1,5 @@
+//! API path string constants for KEF speaker endpoints.
+
 pub const DEVICE_NAME: &str = "settings:/deviceName";
 pub const FIRMWARE: &str = "settings:/releasetext";
 pub const MAC_ADDRESS: &str = "settings:/system/primaryMacAddress";

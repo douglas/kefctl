@@ -1,3 +1,5 @@
+//! Input source selector panel.
+
 use ratatui::{
     Frame,
     layout::Rect,

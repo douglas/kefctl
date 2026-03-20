@@ -1,3 +1,5 @@
+//! Event subscribe/poll/unsubscribe (long-poll).
+
 use crate::error::KefError;
 use super::KefClient;
 

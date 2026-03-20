@@ -1,3 +1,5 @@
+//! Theme system: 13 color fields, Omarchy loader, `block()`/`info_row()`/`section_block()` helpers.
+
 use std::path::PathBuf;
 
 use ratatui::{
