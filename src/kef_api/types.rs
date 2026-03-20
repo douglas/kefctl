@@ -415,4 +415,92 @@ mod tests {
 
         assert_eq!(mode.cycle_prev(), StandbyMode::Never);
     }
+
+    #[test]
+    fn api_value_string_roundtrip() {
+        let val = ApiValue::string("hello");
+        let json = serde_json::to_string(&val).unwrap();
+        assert_eq!(json, r#"{"type":"string_","string_":"hello"}"#);
+
+        let parsed: ApiValue = serde_json::from_str(&json).unwrap();
+        match parsed {
+            ApiValue::String { value } => assert_eq!(value, "hello"),
+            _ => panic!("expected String"),
+        }
+    }
+
+    #[test]
+    fn api_value_standby_mode_roundtrip() {
+        let val = ApiValue::StandbyMode {
+            value: StandbyMode::SixtyMinutes,
+        };
+        let json = serde_json::to_string(&val).unwrap();
+        assert_eq!(
+            json,
+            r#"{"type":"kefStandbyMode","kefStandbyMode":"standby_60mins"}"#
+        );
+
+        let parsed: ApiValue = serde_json::from_str(&json).unwrap();
+        match parsed {
+            ApiValue::StandbyMode { value } => assert_eq!(value, StandbyMode::SixtyMinutes),
+            _ => panic!("expected StandbyMode"),
+        }
+    }
+
+    #[test]
+    fn bass_extension_cycling() {
+        let b = BassExtension::Less;
+        assert_eq!(b.cycle_next().cycle_next().cycle_next(), BassExtension::Less);
+        assert_eq!(b.cycle_prev().cycle_prev().cycle_prev(), BassExtension::Less);
+    }
+
+    #[test]
+    fn bass_extension_display_names() {
+        assert_eq!(BassExtension::Less.display_name(), "Less");
+        assert_eq!(BassExtension::Standard.display_name(), "Standard");
+        assert_eq!(BassExtension::More.display_name(), "More");
+    }
+
+    #[test]
+    fn cable_mode_display_names() {
+        assert_eq!(CableMode::Wired.display_name(), "Wired");
+        assert_eq!(CableMode::Wireless.display_name(), "Wireless");
+    }
+
+    #[test]
+    fn standby_mode_display_names() {
+        assert_eq!(StandbyMode::TwentyMinutes.display_name(), "20 minutes");
+        assert_eq!(StandbyMode::ThirtyMinutes.display_name(), "30 minutes");
+        assert_eq!(StandbyMode::SixtyMinutes.display_name(), "60 minutes");
+        assert_eq!(StandbyMode::Never.display_name(), "Never");
+    }
+
+    #[test]
+    fn source_all_excludes_standby() {
+        assert!(!Source::ALL.contains(&Source::Standby));
+        assert!(Source::ALL.contains(&Source::Wifi));
+        assert!(Source::ALL.contains(&Source::Usb));
+        assert_eq!(Source::ALL.len(), 7);
+    }
+
+    #[test]
+    fn eq_profile_default() {
+        let eq = EqProfile::default();
+        assert_eq!(eq.name, "Standard");
+        assert_eq!(eq.treble, 0.0);
+        assert_eq!(eq.bass_extension, BassExtension::Standard);
+        assert!(!eq.desk_mode);
+        assert!(!eq.wall_mode);
+        assert!(!eq.sub_out);
+        assert_eq!(eq.sub_polarity, SubPolarity::Positive);
+        assert_eq!(eq.sub_crossover, 80);
+        assert!(eq.phase_correction);
+    }
+
+    #[test]
+    fn unknown_api_value_type_fails() {
+        let json = r#"{"type":"unknown_type","unknown_type":"foo"}"#;
+        let result = serde_json::from_str::<ApiValue>(json);
+        assert!(result.is_err());
+    }
 }
