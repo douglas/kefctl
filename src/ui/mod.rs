@@ -5,12 +5,13 @@ mod sidebar;
 mod settings;
 mod source;
 pub mod status;
+pub mod theme;
 
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
-    style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
+    style::{Modifier, Style},
+    text::{Line, Span},
     widgets::Paragraph,
 };
 
@@ -41,13 +42,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     // Help overlay (on top of everything)
     if app.show_help {
-        help::draw(frame);
+        help::draw(frame, app);
     }
 
     // Notification overlay (on top of footer)
     if let Some(ref msg) = app.notification {
-        let notif = Paragraph::new(Text::raw(msg.as_str()))
-            .style(Style::default().fg(Color::Yellow));
+        let notif = Paragraph::new(msg.as_str())
+            .style(Style::default().fg(app.theme.status_warn));
         let notif_area = ratatui::layout::Rect {
             x: 1,
             y: footer_area.y,
@@ -62,35 +63,74 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 }
 
 fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    let theme = &app.theme;
+
     let (conn_text, conn_color) = match app.connection {
-        ConnectionState::Connected => ("●", Color::Green),
-        ConnectionState::Connecting => ("◌", Color::Yellow),
-        ConnectionState::Disconnected if app.demo => ("◆ demo", Color::Magenta),
-        ConnectionState::Disconnected => ("○ disconnected", Color::Red),
+        ConnectionState::Connected => ("●", theme.status_ok),
+        ConnectionState::Connecting => ("◌", theme.status_warn),
+        ConnectionState::Disconnected if app.demo => ("◆ demo", theme.status_demo),
+        ConnectionState::Disconnected => ("○ disconnected", theme.status_error),
     };
 
-    let line = Line::from(vec![
+    let mut spans = vec![
         Span::styled(
             " ? ",
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::DarkGray)
+                .fg(theme.badge_fg)
+                .bg(theme.badge_bg)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" Help  ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            conn_text,
-            Style::default().fg(conn_color),
-        ),
-        Span::styled(
-            format!(" {}  ", app.speaker.name),
-            Style::default().fg(Color::DarkGray),
-        ),
-        Span::styled(
-            app.panel.label(),
-            Style::default().fg(Color::Cyan),
-        ),
-    ]);
+        Span::styled(" Help", Style::default().fg(theme.fg_dim)),
+    ];
 
-    frame.render_widget(Paragraph::new(line), area);
+    // Keybinding hints — responsive based on width
+    let width = area.width as usize;
+    let badges: &[(&str, &str)] = &[
+        ("Space", "play/pause"),
+        ("+/-", "vol"),
+        ("m", "mute"),
+    ];
+
+    if width > 50 {
+        for (key, desc) in badges {
+            spans.push(Span::styled(" │ ", Style::default().fg(theme.fg_dim)));
+            spans.push(Span::styled(
+                format!(" {key} "),
+                Style::default()
+                    .fg(theme.badge_fg)
+                    .bg(theme.badge_bg)
+                    .add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::styled(
+                format!(" {desc}"),
+                Style::default().fg(theme.fg_dim),
+            ));
+        }
+    }
+
+    // Right side: connection + speaker name + panel
+    let right_text = format!(
+        " {conn_text} {} │ {}",
+        app.speaker.name,
+        app.panel.label()
+    );
+    let right_len = right_text.len();
+    let left_len: usize = spans.iter().map(|s| s.width()).sum();
+    let padding = width.saturating_sub(left_len + right_len);
+
+    spans.push(Span::raw(" ".repeat(padding)));
+    spans.push(Span::styled(
+        conn_text,
+        Style::default().fg(conn_color),
+    ));
+    spans.push(Span::styled(
+        format!(" {} │ ", app.speaker.name),
+        Style::default().fg(theme.fg_dim),
+    ));
+    spans.push(Span::styled(
+        app.panel.label(),
+        Style::default().fg(theme.accent),
+    ));
+
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }

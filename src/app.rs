@@ -6,6 +6,7 @@ use ratatui::widgets::ListState;
 use crate::kef_api::types::{
     BassExtension, CableMode, EqProfile, Source, StandbyMode, SubPolarity,
 };
+use crate::ui::theme::Theme;
 
 #[derive(Debug, Clone)]
 pub enum Action {
@@ -184,6 +185,7 @@ pub struct App {
     pub show_help: bool,
     pub should_quit: bool,
     pub demo: bool,
+    pub theme: Theme,
 }
 
 impl App {
@@ -208,6 +210,7 @@ impl App {
             show_help: false,
             should_quit: false,
             demo: false,
+            theme: Theme::load(),
         }
     }
 
@@ -232,6 +235,7 @@ impl App {
             show_help: false,
             should_quit: false,
             demo: true,
+            theme: Theme::load(),
         }
     }
 
