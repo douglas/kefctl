@@ -2,7 +2,7 @@
 
 All notable changes to kefctl will be documented in this file.
 
-## [Unreleased]
+## [0.2.0] — 2026-03-20
 
 ### Changed
 
@@ -29,7 +29,7 @@ All notable changes to kefctl will be documented in this file.
 - `KefError::Config` variant for TOML parse errors
 - `kef_api/paths.rs` — API path string constants (replaces magic strings)
 - `theme.info_row()` and `theme.section_block()` UI helpers
-- 51 new tests (48 → 99): app state machine, UI rendering (TestBackend), error Display formats, API extraction, EqProfile serde, I64 roundtrip, config parsing, insta snapshot tests for all panels
+- 47 new tests (48 → 95): app state machine, UI rendering (TestBackend), error Display formats, API extraction, EqProfile serde, I64 roundtrip, config parsing, insta snapshot tests for all panels
 - `#![deny(unsafe_code)]` — no unsafe in the codebase
 - `#[must_use]` on `handle_key()` to prevent dropped actions
 - Cross-platform `KeyEventKind::Press` filter in event handler
@@ -65,7 +65,7 @@ Initial release.
 
 ### Panels
 
-- **Status** — Speaker info, settings summary, now playing with progress bar and controls hint
+- **Status** — Speaker info, settings summary
 - **Source** — Select input (Wi-Fi, Bluetooth, USB, TV, Optical, Coaxial, Analog) with active marker
 - **EQ / DSP** — Edit treble, bass extension, desk/wall mode, subwoofer, phase correction
 - **Settings** — Cycle cable mode, standby timeout, max volume, front LED, startup tone
