@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, LineGauge, Paragraph},
+    widgets::{LineGauge, Paragraph},
 };
 
 use crate::app::App;
@@ -11,8 +11,8 @@ use crate::ui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::vertical([
-        Constraint::Length(7),
-        Constraint::Length(9),
+        Constraint::Min(3),
+        Constraint::Min(3),
         Constraint::Min(8),
     ])
     .split(area);
@@ -25,20 +25,18 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let s = &app.speaker;
-    let block = Block::default()
-        .title(" Speaker Info ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.border));
+    let block = theme.section_block(" Speaker Info ");
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let rows = Layout::vertical(vec![Constraint::Length(1); 5]).split(inner);
 
+    let ip_str = s.ip.to_string();
     let fields = [
         ("Name", s.name.as_str()),
         ("Model", s.model.as_str()),
         ("Firmware", s.firmware.as_str()),
-        ("IP", &s.ip.to_string()),
+        ("IP", ip_str.as_str()),
         ("MAC", s.mac.as_str()),
     ];
 
@@ -46,24 +44,14 @@ fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
         if i >= rows.len() {
             break;
         }
-        let line = Line::from(vec![
-            Span::styled(
-                format!("  {label:<10}"),
-                Style::default().fg(theme.fg_dim),
-            ),
-            Span::styled(*value, Style::default().fg(theme.fg)),
-        ]);
-        frame.render_widget(Paragraph::new(line), rows[i]);
+        frame.render_widget(Paragraph::new(theme.info_row(label, value)), rows[i]);
     }
 }
 
 fn draw_now_playing(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let s = &app.speaker;
-    let block = Block::default()
-        .title(" Now Playing ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.border));
+    let block = theme.section_block(" Now Playing ");
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -159,10 +147,7 @@ fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let s = &app.speaker;
 
-    let block = Block::default()
-        .title(" Settings ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.border));
+    let block = theme.section_block(" Settings ");
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -196,13 +181,6 @@ fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
         if i >= rows.len() {
             break;
         }
-        let line = Line::from(vec![
-            Span::styled(
-                format!("  {label:<10}"),
-                Style::default().fg(theme.fg_dim),
-            ),
-            Span::styled(value.as_str(), Style::default().fg(theme.fg)),
-        ]);
-        frame.render_widget(Paragraph::new(line), rows[i]);
+        frame.render_widget(Paragraph::new(theme.info_row(label, value)), rows[i]);
     }
 }
