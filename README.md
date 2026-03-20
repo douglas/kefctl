@@ -153,6 +153,51 @@ chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
 | `color3` | Warnings, keybinding labels |
 | `color8` | Dim text, unfocused borders, badge backgrounds |
 
+## Development
+
+### Prerequisites
+
+- Rust 1.85+ (uses edition 2024)
+- A KEF W2-platform speaker on the network (or use `--demo`)
+
+### Quick start
+
+```sh
+git clone https://github.com/douglas/kefctl.git
+cd kefctl
+cargo run -- --demo        # No speaker needed
+cargo test                 # Run tests
+cargo clippy               # Lint
+```
+
+### Testing against a real speaker
+
+```sh
+cargo run -- discover                     # Find your speaker
+cargo run -- --speaker 192.168.50.17      # Connect to it
+kefw2 -s 192.168.50.17 info              # Debug with kefw2 CLI
+curl -s 'http://192.168.50.17/api/getData?path=settings:/deviceName&roles=value'  # Raw API
+```
+
+### Adding a new panel
+
+1. Create `src/ui/mypanel.rs` with `pub fn draw(frame, app, area)`
+2. Add variant to `Panel` enum in `app.rs`, update `ALL`, `label()`, `index()`
+3. Wire it in `ui/mod.rs` match and `app.rs` keyboard handling
+4. Use `theme.block(title, focused)` for borders, `app.theme.*` for colors
+
+### Adding a new API field
+
+1. Add the field to `SpeakerState` in `app.rs`
+2. Test the API endpoint: `curl -s 'http://<ip>/api/getData?path=<path>&roles=value'`
+3. Add an `ApiValue` variant in `types.rs` if it's a new type
+4. Fetch it in `fetch_full_state()` in `kef_api/mod.rs`
+5. Display it in the relevant `ui/*.rs` panel
+
+### Learning resources
+
+New to Rust? See [docs/LEVELUP.md](docs/LEVELUP.md) for a guided tour of the technologies used in this project.
+
 ## KEF API
 
 kefctl communicates with the speaker's HTTP API on port 80:
