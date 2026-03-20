@@ -21,7 +21,8 @@ use event::{Event, EventHandler};
 use kef_api::KefClient;
 use kef_api::types::Source;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     init_logging();
     let cli = Cli::parse();
     let config = match Config::load() {
@@ -35,42 +36,33 @@ fn main() {
     let speaker_ip = cli.speaker.as_deref().or(config.speaker.ip.as_deref());
 
     match cli.command {
-        Some(Commands::Discover) => {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(cmd_discover());
-        }
+        Some(Commands::Discover) => cmd_discover().await,
         Some(Commands::Status) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(cmd_status(ip));
+            cmd_status(ip).await;
         }
         Some(Commands::Source { source: Some(s) }) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(cmd_set_source(ip, &s));
+            cmd_set_source(ip, &s).await;
         }
         Some(Commands::Source { source: None }) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(cmd_get_source(ip));
+            cmd_get_source(ip).await;
         }
         Some(Commands::Volume { level: Some(v) }) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(cmd_set_volume(ip, v));
+            cmd_set_volume(ip, v).await;
         }
         Some(Commands::Volume { level: None }) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(cmd_get_volume(ip));
+            cmd_get_volume(ip).await;
         }
         None => {
-            let rt = tokio::runtime::Runtime::new().unwrap();
             if cli.demo {
-                rt.block_on(run_tui_demo(config));
+                run_tui_demo(config).await;
             } else {
                 let ip_str = speaker_ip.map(String::from);
-                rt.block_on(run_tui_live(ip_str, config));
+                run_tui_live(ip_str, config).await;
             }
         }
     }
