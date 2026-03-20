@@ -4,6 +4,7 @@ use crate::error::KefError;
 use super::KefClient;
 
 impl KefClient {
+    #[tracing::instrument(skip(self))]
     pub async fn subscribe(&self, paths: &[&str]) -> Result<String, KefError> {
         let url = format!("{}/api/event/modifyQueue", self.base_url);
         let subscribe_param = serde_json::to_string(paths).unwrap_or_default();
@@ -28,6 +29,7 @@ impl KefClient {
 
     /// Long-polls the speaker for events. Returns Ok(Some(value)) on events,
     /// Ok(None) on timeout (no events), or Err on real failures.
+    #[tracing::instrument(skip(self))]
     pub async fn poll_events(
         &self,
         queue_id: &str,

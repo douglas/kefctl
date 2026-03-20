@@ -19,7 +19,7 @@ use std::time::Duration;
 use clap::Parser;
 
 use app::{Action, App};
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, SourceArg};
 use config::Config;
 use event::{Event, EventHandler};
 use kef_api::KefClient;
@@ -47,7 +47,7 @@ async fn main() {
         }
         Some(Commands::Source { source: Some(s) }) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
-            cmd_set_source(ip, &s).await;
+            cmd_set_source(ip, s).await;
         }
         Some(Commands::Source { source: None }) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
@@ -239,14 +239,19 @@ fn init_logging() {
         .append(true)
         .open(&log_path)
     {
-        use tracing_subscriber::fmt;
         use tracing_subscriber::prelude::*;
+        use tracing_subscriber::{EnvFilter, fmt};
+
+        let filter = EnvFilter::try_from_env("KEFCTL_LOG")
+            .unwrap_or_else(|_| EnvFilter::new("kefctl=info"));
 
         let file_layer = fmt::layer()
             .with_writer(std::sync::Mutex::new(file))
             .with_ansi(false);
 
-        tracing_subscriber::registry().with(file_layer).init();
+        tracing_subscriber::registry()
+            .with(file_layer.with_filter(filter))
+            .init();
         tracing::debug!("kefctl logging initialized to {}", log_path.display());
     }
 }
@@ -327,21 +332,15 @@ async fn cmd_get_source(ip: IpAddr) {
     }
 }
 
-async fn cmd_set_source(ip: IpAddr, source_name: &str) {
-    let source = match source_name.to_lowercase().as_str() {
-        "usb" => Source::Usb,
-        "wifi" | "wi-fi" => Source::Wifi,
-        "bluetooth" | "bt" => Source::Bluetooth,
-        "tv" | "hdmi" => Source::Tv,
-        "optical" | "opt" => Source::Optical,
-        "coaxial" | "coax" => Source::Coaxial,
-        "analog" | "aux" => Source::Analog,
-        other => {
-            eprintln!(
-                "Unknown source '{other}'. Valid: usb, wifi, bluetooth, tv, optical, coaxial, analog"
-            );
-            std::process::exit(1);
-        }
+async fn cmd_set_source(ip: IpAddr, source_arg: SourceArg) {
+    let source = match source_arg {
+        SourceArg::Usb => Source::Usb,
+        SourceArg::Wifi => Source::Wifi,
+        SourceArg::Bluetooth => Source::Bluetooth,
+        SourceArg::Tv => Source::Tv,
+        SourceArg::Optical => Source::Optical,
+        SourceArg::Coaxial => Source::Coaxial,
+        SourceArg::Analog => Source::Analog,
     };
 
     let client = KefClient::new(ip);

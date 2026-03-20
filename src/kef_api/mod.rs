@@ -27,11 +27,13 @@ pub(crate) struct KefClient {
 impl KefClient {
     pub fn new(ip: IpAddr) -> Self {
         let client = Client::builder()
+            .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(5))
             .build()
             .expect("failed to create HTTP client");
 
         let poll_client = Client::builder()
+            .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(60))
             .build()
             .expect("failed to create poll HTTP client");
@@ -44,6 +46,7 @@ impl KefClient {
         }
     }
 
+    #[tracing::instrument(skip(self), fields(path))]
     pub async fn get_data(&self, path: &str) -> Result<GetDataResponse, KefError> {
         let url = format!("{}/api/getData", self.base_url);
         let resp = self
@@ -63,6 +66,7 @@ impl KefClient {
         Ok(resp.json().await?)
     }
 
+    #[tracing::instrument(skip(self, value), fields(path))]
     pub async fn set_data(&self, path: &str, value: ApiValue) -> Result<(), KefError> {
         let url = format!("{}/api/setData", self.base_url);
         let req = SetDataRequest::new(path, value);
@@ -93,6 +97,7 @@ impl KefClient {
         extract_bool(data)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn fetch_full_state(&self) -> Result<SpeakerState, KefError> {
         let (name, firmware, mac, source, volume, muted, cable_mode, max_volume) = tokio::try_join!(
             self.get_string(paths::DEVICE_NAME),

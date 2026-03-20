@@ -1,6 +1,6 @@
 //! CLI argument parsing (clap derive).
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 /// KEF LSX II TUI Controller
 #[derive(Debug, Parser)]
@@ -28,8 +28,9 @@ pub enum Commands {
 
     /// Get or set the active source
     Source {
-        /// Source to switch to (usb, wifi, bluetooth, tv, optical, coaxial, analog)
-        source: Option<String>,
+        /// Source to switch to
+        #[arg(value_enum)]
+        source: Option<SourceArg>,
     },
 
     /// Get or set the volume
@@ -37,4 +38,15 @@ pub enum Commands {
         /// Volume level (0-100)
         level: Option<i32>,
     },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum SourceArg {
+    Usb,
+    Wifi,
+    Bluetooth,
+    Tv,
+    Optical,
+    Coaxial,
+    Analog,
 }
