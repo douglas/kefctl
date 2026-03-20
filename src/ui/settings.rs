@@ -38,10 +38,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             "Startup Tone",
             if s.startup_tone { "ON" } else { "OFF" }.to_string(),
         ),
-        (
-            "",
-            "◂/▸ cycle   Enter confirm   Esc back".to_string(),
-        ),
+        ("", super::HINT_CYCLE.to_string()),
     ];
 
     for (i, (label, value)) in items.iter().enumerate() {

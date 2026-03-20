@@ -64,10 +64,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             "Phase Correction",
             if eq.phase_correction { "ON" } else { "OFF" }.to_string(),
         ),
-        (
-            "",
-            "◂/▸ adjust   Enter confirm   Esc back".to_string(),
-        ),
+        ("", super::HINT_ADJUST.to_string()),
     ];
 
     for (i, (label, value)) in items.iter().enumerate() {

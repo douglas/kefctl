@@ -115,12 +115,14 @@ fn load_omarchy() -> Option<Theme> {
         parse_hex_color(val)
     };
 
-    let accent = get("accent")?;
-    let foreground = get("foreground").unwrap_or(Color::White);
-    let color1 = get("color1").unwrap_or(Color::Red);
-    let color2 = get("color2").unwrap_or(Color::Green);
-    let color3 = get("color3").unwrap_or(Color::Yellow);
-    let color8 = get("color8").unwrap_or(Color::DarkGray);
+    // Partial loading: use defaults for any missing color
+    let defaults = Theme::default();
+    let accent = get("accent").unwrap_or(defaults.accent);
+    let foreground = get("foreground").unwrap_or(defaults.fg);
+    let color1 = get("color1").unwrap_or(defaults.status_error);
+    let color2 = get("color2").unwrap_or(defaults.status_ok);
+    let color3 = get("color3").unwrap_or(defaults.status_warn);
+    let color8 = get("color8").unwrap_or(defaults.fg_dim);
 
     Some(Theme {
         fg: foreground,
@@ -173,5 +175,24 @@ mod tests {
         // Just verify the struct is populated — actual colors depend
         // on whether Omarchy is installed on this machine
         assert_ne!(format!("{:?}", t.accent), "");
+    }
+
+    #[test]
+    fn partial_omarchy_uses_defaults_for_missing_colors() {
+        // Simulate a minimal colors.toml with only accent
+        let toml = r##"accent = "#ff0000""##;
+        let table: toml::Table = toml.parse().expect("valid toml");
+
+        let get = |key: &str| -> Option<Color> {
+            let val = table.get(key)?.as_str()?;
+            parse_hex_color(val)
+        };
+
+        let defaults = Theme::default();
+        let accent = get("accent").unwrap_or(defaults.accent);
+        let foreground = get("foreground").unwrap_or(defaults.fg);
+
+        assert_eq!(accent, Color::Rgb(255, 0, 0));
+        assert_eq!(foreground, defaults.fg); // falls back to default
     }
 }

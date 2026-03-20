@@ -19,6 +19,9 @@ use ratatui::{
 
 use crate::app::{App, ConnectionState, Panel};
 
+pub(crate) const HINT_ADJUST: &str = "◂/▸ adjust   Enter confirm   Esc back";
+pub(crate) const HINT_CYCLE: &str = "◂/▸ cycle   Enter confirm   Esc back";
+
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let outer = Layout::vertical([Constraint::Min(1), Constraint::Length(1)])
         .split(frame.area());
