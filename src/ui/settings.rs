@@ -1,19 +1,19 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
+    style::{Modifier, Style},
+    widgets::Paragraph,
 };
 
-use crate::app::App;
+use crate::app::{App, Focus};
 
 const SETTINGS_ROWS: usize = 6;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(" Settings ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+    let theme = &app.theme;
+    let focused = app.focus == Focus::Main;
+
+    let block = theme.block(" Settings ", focused);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -27,10 +27,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let items = [
         ("Cable Mode", s.cable_mode.display_name().to_string()),
         ("Standby", s.standby_mode.display_name().to_string()),
-        (
-            "Max Volume",
-            format!("{}", s.max_volume),
-        ),
+        ("Max Volume", format!("{}", s.max_volume)),
         (
             "Front LED",
             if s.front_led { "ON" } else { "OFF" }.to_string(),
@@ -51,12 +48,12 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         }
         let style = if i == focus {
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme.accent)
                 .add_modifier(Modifier::BOLD)
         } else if label.is_empty() {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.fg_dim)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(theme.fg)
         };
 
         let marker = if i == focus && !label.is_empty() {

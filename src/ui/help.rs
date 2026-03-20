@@ -1,12 +1,16 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Flex, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
 };
 
-pub fn draw(frame: &mut Frame) {
+use crate::app::App;
+use crate::ui::theme::Theme;
+
+pub fn draw(frame: &mut Frame, app: &App) {
+    let theme = &app.theme;
     let area = centered_rect(60, 28, frame.area());
 
     frame.render_widget(Clear, area);
@@ -15,57 +19,57 @@ pub fn draw(frame: &mut Frame) {
         .title(" Keybindings ")
         .title_bottom(" ? or Esc to close ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(theme.accent));
 
     let lines = vec![
-        heading("Navigation"),
-        binding("Tab / Shift+Tab", "Next / previous panel"),
-        binding("j / k  ↓ / ↑", "Move down / up"),
-        binding("h / ←", "Focus sidebar / back"),
-        binding("l / → / Enter", "Focus main panel / select"),
-        binding("Esc", "Back to sidebar"),
+        heading("Navigation", theme),
+        binding("Tab / Shift+Tab", "Next / previous panel", theme),
+        binding("j / k  ↓ / ↑", "Move down / up", theme),
+        binding("h / ←", "Focus sidebar / back", theme),
+        binding("l / → / Enter", "Focus main panel / select", theme),
+        binding("Esc", "Back to sidebar", theme),
         Line::raw(""),
-        heading("Playback"),
-        binding("Space", "Play / pause"),
-        binding("n / p", "Next / previous track"),
-        binding("f / b", "Seek forward / backward 10s"),
+        heading("Playback", theme),
+        binding("Space", "Play / pause", theme),
+        binding("n / p", "Next / previous track", theme),
+        binding("f / b", "Seek forward / backward 10s", theme),
         Line::raw(""),
-        heading("Volume"),
-        binding("+ / -", "Volume up / down"),
-        binding("m", "Toggle mute"),
+        heading("Volume", theme),
+        binding("+ / -", "Volume up / down", theme),
+        binding("m", "Toggle mute", theme),
         Line::raw(""),
-        heading("Panels"),
-        binding("Source", "j/k navigate, Enter to switch"),
-        binding("EQ / DSP", "j/k navigate, h/l adjust values"),
-        binding("Settings", "j/k navigate, h/l cycle options"),
+        heading("Panels", theme),
+        binding("Source", "j/k navigate, Enter to switch", theme),
+        binding("EQ / DSP", "j/k navigate, h/l adjust values", theme),
+        binding("Settings", "j/k navigate, h/l cycle options", theme),
         Line::raw(""),
-        heading("General"),
-        binding("?", "Show this help"),
-        binding("q / Ctrl+c", "Quit"),
+        heading("General", theme),
+        binding("?", "Show this help", theme),
+        binding("q / Ctrl+c", "Quit", theme),
     ];
 
     let para = Paragraph::new(lines).block(block);
     frame.render_widget(para, area);
 }
 
-fn heading(text: &str) -> Line<'_> {
+fn heading<'a>(text: &'a str, theme: &Theme) -> Line<'a> {
     Line::from(Span::styled(
         format!("  {text}"),
         Style::default()
-            .fg(Color::Cyan)
+            .fg(theme.accent)
             .add_modifier(Modifier::BOLD),
     ))
 }
 
-fn binding<'a>(key: &'a str, desc: &'a str) -> Line<'a> {
+fn binding<'a>(key: &'a str, desc: &'a str, theme: &Theme) -> Line<'a> {
     Line::from(vec![
         Span::styled(
             format!("    {key:<20}"),
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme.accent_secondary)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(desc, Style::default().fg(Color::White)),
+        Span::styled(desc, Style::default().fg(theme.fg)),
     ])
 }
 

@@ -1,12 +1,13 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, LineGauge, Paragraph},
 };
 
 use crate::app::App;
+use crate::ui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::vertical([
@@ -22,11 +23,12 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = &app.theme;
     let s = &app.speaker;
     let block = Block::default()
         .title(" Speaker Info ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(theme.border));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -47,20 +49,21 @@ fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
         let line = Line::from(vec![
             Span::styled(
                 format!("  {label:<10}"),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme.fg_dim),
             ),
-            Span::styled(*value, Style::default().fg(Color::White)),
+            Span::styled(*value, Style::default().fg(theme.fg)),
         ]);
         frame.render_widget(Paragraph::new(line), rows[i]);
     }
 }
 
 fn draw_now_playing(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = &app.theme;
     let s = &app.speaker;
     let block = Block::default()
         .title(" Now Playing ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(theme.border));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -82,18 +85,18 @@ fn draw_now_playing(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled(
                 format!("  {state_icon}  "),
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(theme.accent),
             ),
             Span::styled(
                 track,
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme.fg)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(Span::styled(
             format!("     {artist}"),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme.fg_dim),
         )),
     ];
     frame.render_widget(Paragraph::new(track_lines), chunks[0]);
@@ -115,25 +118,51 @@ fn draw_now_playing(frame: &mut Frame, app: &App, area: Rect) {
     let gauge = LineGauge::default()
         .label(time_label)
         .ratio(ratio)
-        .filled_style(Style::default().fg(Color::Cyan))
-        .unfilled_style(Style::default().fg(Color::DarkGray));
+        .filled_style(Style::default().fg(theme.progress_filled))
+        .unfilled_style(Style::default().fg(theme.progress_empty));
     frame.render_widget(gauge, chunks[1]);
 
     // Controls hint
-    let controls = " [Space] play/pause  [n/p] next/prev  [f/b] seek  [+/-] volume";
-    frame.render_widget(
-        Paragraph::new(controls).style(Style::default().fg(Color::DarkGray)),
-        chunks[2],
-    );
+    draw_controls_hint(frame, theme, chunks[2]);
+}
+
+fn draw_controls_hint(frame: &mut Frame, theme: &Theme, area: Rect) {
+    let pairs = [
+        ("Space", "play/pause"),
+        ("n/p", "next/prev"),
+        ("f/b", "seek"),
+        ("+/-", "volume"),
+    ];
+
+    let mut spans = Vec::new();
+    spans.push(Span::raw(" "));
+    for (i, (key, desc)) in pairs.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" │ ", Style::default().fg(theme.fg_dim)));
+        }
+        spans.push(Span::styled(
+            *key,
+            Style::default()
+                .fg(theme.accent_secondary)
+                .add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled(
+            format!(" {desc}"),
+            Style::default().fg(theme.fg_dim),
+        ));
+    }
+
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = &app.theme;
     let s = &app.speaker;
 
     let block = Block::default()
         .title(" Settings ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(theme.border));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -158,8 +187,10 @@ fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
         ),
     ];
 
-    let rows = Layout::vertical(vec![Constraint::Length(1); fields.len().max(inner.height as usize)])
-        .split(inner);
+    let rows = Layout::vertical(
+        vec![Constraint::Length(1); fields.len().max(inner.height as usize)],
+    )
+    .split(inner);
 
     for (i, (label, value)) in fields.iter().enumerate() {
         if i >= rows.len() {
@@ -168,9 +199,9 @@ fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
         let line = Line::from(vec![
             Span::styled(
                 format!("  {label:<10}"),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme.fg_dim),
             ),
-            Span::styled(value.as_str(), Style::default().fg(Color::White)),
+            Span::styled(value.as_str(), Style::default().fg(theme.fg)),
         ]);
         frame.render_widget(Paragraph::new(line), rows[i]);
     }

@@ -1,27 +1,29 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
+    style::{Modifier, Style},
+    widgets::Paragraph,
 };
 
-use crate::app::App;
+use crate::app::{App, Focus};
 
 const EQ_ROWS: usize = 8;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(" EQ / DSP ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+    let theme = &app.theme;
+    let focused = app.focus == Focus::Main;
+
+    let block = theme.block(" EQ / DSP ", focused);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let eq = &app.speaker.eq_profile;
     let focus = app.eq_focus;
 
-    let rows = Layout::vertical(vec![Constraint::Length(1); EQ_ROWS.max(inner.height as usize)])
-        .split(inner);
+    let rows = Layout::vertical(
+        vec![Constraint::Length(1); EQ_ROWS.max(inner.height as usize)],
+    )
+    .split(inner);
 
     let items = [
         ("Profile", eq.name.clone()),
@@ -72,12 +74,12 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         }
         let style = if i == focus {
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme.accent)
                 .add_modifier(Modifier::BOLD)
         } else if label.is_empty() {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.fg_dim)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(theme.fg)
         };
 
         let marker = if i == focus && !label.is_empty() {

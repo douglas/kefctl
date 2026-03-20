@@ -1,17 +1,17 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
+    style::{Modifier, Style},
+    widgets::Paragraph,
 };
 
-use crate::app::{App, ConnectionState};
+use crate::app::{App, ConnectionState, Focus};
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .title(" Network ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
+    let theme = &app.theme;
+    let focused = app.focus == Focus::Main;
+
+    let block = theme.block(" Network ", focused);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -19,9 +19,9 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
     // Connection status
     let (status_text, status_color) = match app.connection {
-        ConnectionState::Connected => ("● Connected", Color::Green),
-        ConnectionState::Connecting => ("◌ Connecting...", Color::Yellow),
-        ConnectionState::Disconnected => ("○ Disconnected", Color::Red),
+        ConnectionState::Connected => ("● Connected", theme.status_ok),
+        ConnectionState::Connecting => ("◌ Connecting...", theme.status_warn),
+        ConnectionState::Disconnected => ("○ Disconnected", theme.status_error),
     };
     let conn_info = format!(
         "  Status: {}\n  IP: {}\n  Name: {}",
@@ -36,7 +36,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     if app.network_speakers.is_empty() {
         frame.render_widget(
             Paragraph::new("  No speakers discovered. Press 'd' to scan.")
-                .style(Style::default().fg(Color::DarkGray)),
+                .style(Style::default().fg(theme.fg_dim)),
             chunks[1],
         );
     } else {
@@ -47,7 +47,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
 
         frame.render_widget(
             Paragraph::new("  Discovered speakers:")
-                .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                .style(Style::default().fg(theme.fg).add_modifier(Modifier::BOLD)),
             rows[0],
         );
 
@@ -57,7 +57,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             }
             let text = format!("    {} — {}:{}", speaker.name, speaker.ip, speaker.port);
             frame.render_widget(
-                Paragraph::new(text).style(Style::default().fg(Color::White)),
+                Paragraph::new(text).style(Style::default().fg(theme.fg)),
                 rows[i + 1],
             );
         }
