@@ -15,6 +15,7 @@ pub enum Event {
     Tick,
     SpeakerUpdate(Box<SpeakerState>),
     SpeakerError(String),
+    ThemeChanged,
 }
 
 pub struct EventHandler {
@@ -61,9 +62,27 @@ impl EventHandler {
 
         // Speaker poll task (only if we have a client)
         if let Some(client) = client {
-            let tx_speaker = tx;
+            let tx_speaker = tx.clone();
             tokio::spawn(async move {
                 speaker_poll_loop(client, tx_speaker).await;
+            });
+        }
+
+        // SIGUSR1 theme reload listener
+        #[cfg(unix)]
+        {
+            let tx_signal = tx;
+            tokio::spawn(async move {
+                use tokio::signal::unix::{SignalKind, signal};
+                let Ok(mut stream) = signal(SignalKind::user_defined1()) else {
+                    return;
+                };
+                loop {
+                    stream.recv().await;
+                    if tx_signal.send(Event::ThemeChanged).is_err() {
+                        break;
+                    }
+                }
             });
         }
 

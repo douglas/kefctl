@@ -161,6 +161,9 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
             Some(Event::Tick) => {
                 app.tick();
             }
+            Some(Event::ThemeChanged) => {
+                app.theme = ui::theme::Theme::load();
+            }
             Some(Event::Resize(_, _)) => {}
             Some(Event::SpeakerUpdate(state)) => {
                 app.speaker = *state;

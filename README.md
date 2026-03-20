@@ -67,6 +67,29 @@ name = "Living Room"
 refresh_ms = 1000
 ```
 
+## Themes
+
+kefctl integrates with [Omarchy](https://github.com/basecamp/omarchy) for live theme switching. When Omarchy is installed, colors are read from `~/.config/omarchy/current/theme/colors.toml` at startup. Without Omarchy, a built-in default theme is used.
+
+### Live reload
+
+Send `SIGUSR1` to reload the theme without restarting:
+
+```sh
+pkill -USR1 kefctl
+```
+
+To auto-reload when Omarchy changes themes, add a hook:
+
+```sh
+mkdir -p ~/.config/omarchy/hooks/theme-set.d
+cat > ~/.config/omarchy/hooks/theme-set.d/kefctl << 'EOF'
+#!/bin/bash
+pkill -USR1 kefctl 2>/dev/null || true
+EOF
+chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
+```
+
 ## Speaker Resolution
 
 The speaker IP is resolved in this order:
