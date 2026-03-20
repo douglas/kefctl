@@ -49,13 +49,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if let Some(ref msg) = app.notification {
         let notif = Paragraph::new(msg.as_str())
             .style(Style::default().fg(app.theme.status_warn));
+        #[allow(clippy::cast_possible_truncation)]
+        let msg_width = msg.len() as u16 + 2;
         let notif_area = ratatui::layout::Rect {
             x: 1,
             y: footer_area.y,
-            width: footer_area
-                .width
-                .saturating_sub(2)
-                .min(msg.len() as u16 + 2),
+            width: footer_area.width.saturating_sub(2).min(msg_width),
             height: 1,
         };
         frame.render_widget(notif, notif_area);
@@ -114,7 +113,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         app.panel.label()
     );
     let right_len = right_text.len();
-    let left_len: usize = spans.iter().map(|s| s.width()).sum();
+    let left_len: usize = spans.iter().map(Span::width).sum();
     let padding = width.saturating_sub(left_len + right_len);
 
     spans.push(Span::raw(" ".repeat(padding)));

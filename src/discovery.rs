@@ -42,10 +42,8 @@ pub async fn discover_speakers(
                     });
                 }
             }
-            Ok(Ok(Ok(_))) => continue,
-            Ok(Ok(Err(_))) => continue, // recv timeout, keep looping
-            Ok(Err(_)) => break,        // spawn_blocking error
-            Err(_) => break,            // overall timeout
+            Ok(Ok(Ok(_) | Err(_))) => {} // other events or recv timeout
+            Ok(Err(_)) | Err(_) => break, // spawn_blocking or overall timeout
         }
     }
 

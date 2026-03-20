@@ -92,7 +92,7 @@ fn draw_now_playing(frame: &mut Frame, app: &App, area: Rect) {
     // Progress bar
     let (position, duration) = (s.position.unwrap_or(0), s.duration.unwrap_or(0));
     let ratio = if duration > 0 {
-        (position as f64 / duration as f64).clamp(0.0, 1.0)
+        (f64::from(position) / f64::from(duration)).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -153,6 +153,7 @@ fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
 
     let mute_str = if s.muted { " [MUTED]" } else { "" };
     let vol_bar_width = 20;
+    #[allow(clippy::cast_sign_loss)] // volume and max_volume are always non-negative
     let filled =
         (s.volume as usize * vol_bar_width / s.max_volume.max(1) as usize).min(vol_bar_width);
     let vol_bar: String = "█".repeat(filled) + &"░".repeat(vol_bar_width - filled);

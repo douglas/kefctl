@@ -53,8 +53,7 @@ impl EventHandler {
                                 }
                             }
                             Some(Ok(_)) => {}
-                            Some(Err(_)) => break,
-                            None => break,
+                            Some(Err(_)) | None => break,
                         }
                     }
                 }
@@ -133,10 +132,7 @@ async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Eve
                         }
                     }
                 }
-                Ok(None) => {
-                    // Timeout, no events — just re-poll
-                    continue;
-                }
+                Ok(None) => {} // Timeout, no events — just re-poll
                 Err(e) => {
                     let _ = tx.send(Event::SpeakerError(format!("Poll failed: {e}")));
                     // Break inner loop to re-subscribe

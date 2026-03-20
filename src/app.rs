@@ -74,6 +74,7 @@ pub enum Focus {
     Main,
 }
 
+#[allow(clippy::struct_excessive_bools)] // mirrors KEF API fields
 #[derive(Debug, Clone)]
 pub struct SpeakerState {
     pub name: String,
@@ -284,7 +285,7 @@ impl App {
         // Help overlay intercepts all keys
         if self.show_help {
             match key.code {
-                KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => {
+                KeyCode::Char('?' | 'q') | KeyCode::Esc | KeyCode::Enter => {
                     self.show_help = false;
                 }
                 _ => {}
@@ -319,7 +320,7 @@ impl App {
                 self.speaker.muted = !self.speaker.muted;
                 return Some(Action::ToggleMute(self.speaker.muted));
             }
-            KeyCode::Char('+') | KeyCode::Char('=') => {
+            KeyCode::Char('+' | '=') => {
                 if self.speaker.volume < self.speaker.max_volume {
                     self.speaker.volume += 1;
                 }
@@ -380,19 +381,13 @@ impl App {
         }
 
         match self.panel {
-            Panel::Status => {
-                if key.code == KeyCode::Char('h') {
-                    self.focus = Focus::Sidebar;
-                }
-                None
-            }
             Panel::Source => self.handle_key_source(key),
             Panel::Eq => {
                 self.handle_key_eq(key);
                 None // EQ API integration deferred — complex nested structure
             }
             Panel::Settings => self.handle_key_settings(key),
-            Panel::Network => {
+            Panel::Status | Panel::Network => {
                 if key.code == KeyCode::Char('h') {
                     self.focus = Focus::Sidebar;
                 }
@@ -414,12 +409,12 @@ impl App {
                     .select(Some(if i == 0 { count - 1 } else { i - 1 }));
             }
             KeyCode::Enter => {
-                if let Some(i) = self.source_list_state.selected() {
-                    if i < count {
-                        let source = Source::ALL[i];
-                        self.speaker.source = source;
-                        return Some(Action::SetSource(source));
-                    }
+                if let Some(i) = self.source_list_state.selected()
+                    && i < count
+                {
+                    let source = Source::ALL[i];
+                    self.speaker.source = source;
+                    return Some(Action::SetSource(source));
                 }
             }
             KeyCode::Char('h') => self.focus = Focus::Sidebar,
@@ -451,10 +446,9 @@ impl App {
     fn eq_adjust(&mut self, dir: i32) {
         let eq = &mut self.speaker.eq_profile;
         match self.eq_focus {
-            0 => {} // Profile name — not adjustable inline
             1 => {
                 // Treble: -5.0 to +5.0 in 0.5 steps
-                eq.treble = (eq.treble + dir as f64 * 0.5).clamp(-5.0, 5.0);
+                eq.treble = (eq.treble + f64::from(dir) * 0.5).clamp(-5.0, 5.0);
             }
             2 => {
                 // Bass extension

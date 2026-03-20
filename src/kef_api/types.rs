@@ -210,6 +210,7 @@ impl SetDataRequest {
 
 // ---------- EQ ----------
 
+#[allow(clippy::struct_excessive_bools)] // mirrors KEF API EQ structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EqProfile {
     pub name: String,
