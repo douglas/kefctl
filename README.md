@@ -2,6 +2,8 @@
 
 TUI controller for KEF W2-platform speakers (LSX II, LS50 Wireless II, LS60 Wireless).
 
+![kefctl status panel](docs/images/01_status_section.png)
+
 Keyboard-driven terminal interface that talks to KEF speakers over their HTTP JSON API. Auto-discovers speakers via mDNS, provides real-time status updates, and supports scriptable CLI commands.
 
 ## Install
@@ -55,11 +57,25 @@ Press `?` in the app for the full keybindings overlay.
 
 ## Panels
 
-- **Status** — Speaker info, settings summary
-- **Source** — Select input source (Wi-Fi, Bluetooth, USB, TV, Optical, Coaxial, Analog)
-- **EQ / DSP** — Treble, bass extension, desk/wall mode, subwoofer settings, phase correction
-- **Settings** — Cable mode, standby timeout, max volume, front LED, startup tone
-- **Network** — Connection status, discovered speakers on the network
+**Status** — Speaker info, settings summary
+
+![Status panel](docs/images/01_status_section.png)
+
+**Source** — Select input source (Wi-Fi, Bluetooth, USB, TV, Optical, Coaxial, Analog)
+
+![Source panel](docs/images/02_source_section.png)
+
+**EQ / DSP** — Treble, bass extension, desk/wall mode, subwoofer settings, phase correction
+
+![EQ/DSP panel](docs/images/03_eq_section.png)
+
+**Settings** — Cable mode, standby timeout, max volume, front LED, startup tone
+
+![Settings panel](docs/images/04_settings_section.png)
+
+**Network** — Connection status, discovered speakers on the network
+
+![Network panel](docs/images/05_network_section.png)
 
 ## Architecture
 

@@ -251,6 +251,10 @@ The `#[serde(rename = "...")]` attributes control the JSON field names. If you a
 
 Ratatui is an immediate-mode UI library. Every frame, you describe what to draw. There's no retained widget tree (unlike HTML/React).
 
+Here's what kefctl looks like — a sidebar + main panel layout with themed borders and styled text:
+
+![kefctl status panel](images/01_status_section.png)
+
 ### The render cycle
 
 ```rust
