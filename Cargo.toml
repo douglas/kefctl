@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.86.0"
 description = "TUI controller for KEF LSX II speakers"
+license = "MIT"
+repository = "https://github.com/douglas/kefctl"
+keywords = ["kef", "tui", "speaker", "audio", "ratatui"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 ratatui = "0.30"
