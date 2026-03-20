@@ -7,7 +7,7 @@ description = "TUI controller for KEF LSX II speakers"
 [dependencies]
 ratatui = "0.30"
 crossterm = "0.29"
-reqwest = { version = "0.13", features = ["json"] }
+reqwest = { version = "0.13", features = ["json", "query"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
