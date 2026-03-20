@@ -4,7 +4,6 @@ use reqwest::Client;
 
 use crate::error::KefError;
 use super::KefClient;
-use super::types::EventSubscribeResponse;
 
 impl KefClient {
     pub async fn subscribe(&self, paths: &[&str]) -> Result<String, KefError> {
@@ -24,30 +23,38 @@ impl KefClient {
             });
         }
 
-        let sub: EventSubscribeResponse = resp.json().await?;
-        Ok(sub.queue_id)
+        // API returns a plain JSON string like "{uuid}" — strip braces
+        let queue_id: String = resp.json().await?;
+        Ok(queue_id.trim_matches(|c| c == '{' || c == '}').to_string())
     }
 
+    /// Long-polls the speaker for events. Returns Ok(Some(value)) on events,
+    /// Ok(None) on timeout (no events), or Err on real failures.
     pub async fn poll_events(
         &self,
         queue_id: &str,
-        timeout_ms: u64,
-    ) -> Result<serde_json::Value, KefError> {
+    ) -> Result<Option<serde_json::Value>, KefError> {
         let url = format!("{}/api/event/pollQueue", self.base_url);
-        // Poll uses a longer timeout since the server holds the connection
+        // Speaker holds connection for up to 30s; give reqwest 60s
         let poll_client = Client::builder()
-            .timeout(Duration::from_millis(timeout_ms + 5000))
+            .timeout(Duration::from_secs(60))
             .build()
             .expect("failed to create poll client");
 
-        let resp = poll_client
+        let result = poll_client
             .get(&url)
             .query(&[
                 ("queueId", queue_id),
-                ("timeout", &timeout_ms.to_string()),
+                ("timeout", "30000"),
             ])
             .send()
-            .await?;
+            .await;
+
+        let resp = match result {
+            Ok(resp) => resp,
+            Err(e) if e.is_timeout() => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
 
         if !resp.status().is_success() {
             return Err(KefError::Api {
@@ -56,7 +63,15 @@ impl KefClient {
             });
         }
 
-        Ok(resp.json().await?)
+        let body = resp.text().await.unwrap_or_default();
+        if body.is_empty() || body == "[]" {
+            return Ok(None);
+        }
+
+        match serde_json::from_str(&body) {
+            Ok(val) => Ok(Some(val)),
+            Err(_) => Ok(None),
+        }
     }
 
     pub async fn unsubscribe(&self, queue_id: &str) -> Result<(), KefError> {

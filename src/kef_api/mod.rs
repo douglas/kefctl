@@ -105,17 +105,11 @@ impl KefClient {
             self.get_max_volume(),
         )?;
 
-        let (standby_minutes, front_led_disabled, startup_tone) = tokio::try_join!(
+        let (standby_mode, front_led_disabled, startup_tone) = tokio::try_join!(
             self.get_standby_mode(),
             self.get_front_led_disabled(),
             self.get_startup_tone(),
         )?;
-
-        let standby_mode = match standby_minutes {
-            20 => types::StandbyMode::TwentyMinutes,
-            0 => types::StandbyMode::Never,
-            _ => types::StandbyMode::SixtyMinutes,
-        };
 
         Ok(SpeakerState {
             name,

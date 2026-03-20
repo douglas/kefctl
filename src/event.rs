@@ -117,10 +117,9 @@ async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Eve
 
         // Poll loop
         loop {
-            match client.poll_events(&queue_id, 5000).await {
-                Ok(_events) => {
+            match client.poll_events(&queue_id).await {
+                Ok(Some(_)) => {
                     // On any event, re-fetch full state for simplicity
-                    // A more sophisticated approach would parse individual events
                     match client.fetch_full_state().await {
                         Ok(state) => {
                             if tx.send(Event::SpeakerUpdate(Box::new(state))).is_err() {
@@ -132,6 +131,10 @@ async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Eve
                                 tx.send(Event::SpeakerError(format!("State fetch failed: {e}")));
                         }
                     }
+                }
+                Ok(None) => {
+                    // Timeout, no events — just re-poll
+                    continue;
                 }
                 Err(e) => {
                     let _ = tx.send(Event::SpeakerError(format!("Poll failed: {e}")));

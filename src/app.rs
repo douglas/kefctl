@@ -20,7 +20,7 @@ pub enum Action {
     SeekForward,
     SeekBackward,
     SetCableMode(CableMode),
-    SetStandbyMode(i32),
+    SetStandbyMode(StandbyMode),
     SetMaxVolume(i32),
     SetFrontLed(bool),
     SetStartupTone(bool),
@@ -545,12 +545,7 @@ impl App {
                 } else {
                     self.speaker.standby_mode.cycle_prev()
                 };
-                let minutes = match self.speaker.standby_mode {
-                    StandbyMode::TwentyMinutes => 20,
-                    StandbyMode::SixtyMinutes => 60,
-                    StandbyMode::Never => 0,
-                };
-                Some(Action::SetStandbyMode(minutes))
+                Some(Action::SetStandbyMode(self.speaker.standby_mode))
             }
             2 => {
                 self.speaker.max_volume =

@@ -1,6 +1,6 @@
 use crate::error::KefError;
 use super::KefClient;
-use super::types::{ApiValue, CableMode};
+use super::types::{ApiValue, CableMode, StandbyMode};
 
 impl KefClient {
     pub async fn get_cable_mode(&self) -> Result<CableMode, KefError> {
@@ -11,14 +11,18 @@ impl KefClient {
         }
     }
 
-    pub async fn get_standby_mode(&self) -> Result<i32, KefError> {
-        self.get_i32("settings:/kef/host/standbyMode").await
+    pub async fn get_standby_mode(&self) -> Result<StandbyMode, KefError> {
+        let data = self.get_data("settings:/kef/host/standbyMode").await?;
+        match data.into_iter().next() {
+            Some(ApiValue::StandbyMode { value }) => Ok(value),
+            _ => Ok(StandbyMode::default()),
+        }
     }
 
-    pub async fn set_standby_mode(&self, minutes: i32) -> Result<(), KefError> {
+    pub async fn set_standby_mode(&self, mode: StandbyMode) -> Result<(), KefError> {
         self.set_data(
             "settings:/kef/host/standbyMode",
-            ApiValue::i32(minutes),
+            ApiValue::StandbyMode { value: mode },
         )
         .await
     }

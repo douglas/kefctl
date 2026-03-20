@@ -63,12 +63,14 @@ impl CableMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum StandbyMode {
-    #[serde(rename = "20")]
+    #[serde(rename = "standby_20mins")]
     TwentyMinutes,
-    #[serde(rename = "60")]
+    #[serde(rename = "standby_30mins")]
+    ThirtyMinutes,
+    #[serde(rename = "standby_60mins")]
     #[default]
     SixtyMinutes,
-    #[serde(rename = "0")]
+    #[serde(rename = "standby_off")]
     Never,
 }
 
@@ -76,6 +78,7 @@ impl StandbyMode {
     pub fn display_name(self) -> &'static str {
         match self {
             StandbyMode::TwentyMinutes => "20 minutes",
+            StandbyMode::ThirtyMinutes => "30 minutes",
             StandbyMode::SixtyMinutes => "60 minutes",
             StandbyMode::Never => "Never",
         }
@@ -83,7 +86,8 @@ impl StandbyMode {
 
     pub fn cycle_next(self) -> Self {
         match self {
-            StandbyMode::TwentyMinutes => StandbyMode::SixtyMinutes,
+            StandbyMode::TwentyMinutes => StandbyMode::ThirtyMinutes,
+            StandbyMode::ThirtyMinutes => StandbyMode::SixtyMinutes,
             StandbyMode::SixtyMinutes => StandbyMode::Never,
             StandbyMode::Never => StandbyMode::TwentyMinutes,
         }
@@ -92,7 +96,8 @@ impl StandbyMode {
     pub fn cycle_prev(self) -> Self {
         match self {
             StandbyMode::TwentyMinutes => StandbyMode::Never,
-            StandbyMode::SixtyMinutes => StandbyMode::TwentyMinutes,
+            StandbyMode::ThirtyMinutes => StandbyMode::TwentyMinutes,
+            StandbyMode::SixtyMinutes => StandbyMode::ThirtyMinutes,
             StandbyMode::Never => StandbyMode::SixtyMinutes,
         }
     }
@@ -150,6 +155,11 @@ pub enum ApiValue {
     CableMode {
         #[serde(rename = "kefCableMode")]
         value: CableMode,
+    },
+    #[serde(rename = "kefStandbyMode")]
+    StandbyMode {
+        #[serde(rename = "kefStandbyMode")]
+        value: StandbyMode,
     },
 }
 
@@ -455,9 +465,16 @@ mod tests {
     #[test]
     fn standby_mode_cycling() {
         let mode = StandbyMode::TwentyMinutes;
-        assert_eq!(mode.cycle_next(), StandbyMode::SixtyMinutes);
-        assert_eq!(mode.cycle_next().cycle_next(), StandbyMode::Never);
-        assert_eq!(mode.cycle_next().cycle_next().cycle_next(), StandbyMode::TwentyMinutes);
+        assert_eq!(mode.cycle_next(), StandbyMode::ThirtyMinutes);
+        assert_eq!(mode.cycle_next().cycle_next(), StandbyMode::SixtyMinutes);
+        assert_eq!(
+            mode.cycle_next().cycle_next().cycle_next(),
+            StandbyMode::Never
+        );
+        assert_eq!(
+            mode.cycle_next().cycle_next().cycle_next().cycle_next(),
+            StandbyMode::TwentyMinutes
+        );
 
         assert_eq!(mode.cycle_prev(), StandbyMode::Never);
     }
