@@ -11,7 +11,7 @@ pub async fn discover_speakers(
 ) -> Result<Vec<DiscoveredSpeaker>, KefError> {
     let mdns = ServiceDaemon::new().map_err(|e| KefError::Discovery(e.to_string()))?;
     let receiver = mdns
-        .browse("_http._tcp.local.")
+        .browse("_kef-info._tcp.local.")
         .map_err(|e| KefError::Discovery(e.to_string()))?;
 
     let mut speakers = Vec::new();
@@ -31,17 +31,15 @@ pub async fn discover_speakers(
         {
             Ok(Ok(Ok(ServiceEvent::ServiceResolved(info)))) => {
                 let name = info.get_fullname().to_string();
-                if name.to_lowercase().contains("kef") {
-                    for addr in info.get_addresses_v4() {
-                        speakers.push(DiscoveredSpeaker {
-                            name: info
-                                .get_property_val_str("fn")
-                                .unwrap_or(&name)
-                                .to_string(),
-                            ip: IpAddr::V4(addr),
-                            port: info.get_port(),
-                        });
-                    }
+                for addr in info.get_addresses_v4() {
+                    speakers.push(DiscoveredSpeaker {
+                        name: info
+                            .get_property_val_str("fn")
+                            .unwrap_or(&name)
+                            .to_string(),
+                        ip: IpAddr::V4(addr),
+                        port: info.get_port(),
+                    });
                 }
             }
             Ok(Ok(Ok(_))) => continue,
