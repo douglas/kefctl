@@ -180,6 +180,7 @@ pub struct App {
     pub settings_focus: usize,
     pub network_speakers: Vec<DiscoveredSpeaker>,
     pub notification: Option<String>,
+    pub notification_ttl: u8,
     pub should_quit: bool,
     pub demo: bool,
 }
@@ -202,6 +203,7 @@ impl App {
             settings_focus: 0,
             network_speakers: vec![],
             notification: None,
+            notification_ttl: 0,
             should_quit: false,
             demo: false,
         }
@@ -224,9 +226,15 @@ impl App {
             settings_focus: 0,
             network_speakers: vec![],
             notification: None,
+            notification_ttl: 0,
             should_quit: false,
             demo: true,
         }
+    }
+
+    pub fn set_notification(&mut self, msg: String) {
+        self.notification = Some(msg);
+        self.notification_ttl = 3;
     }
 
     pub fn select_panel(&mut self, panel: Panel) {
@@ -254,6 +262,15 @@ impl App {
             && pos < dur
         {
             self.speaker.position = Some(pos + 1);
+        }
+
+        // Auto-dismiss notifications
+        if self.notification.is_some() {
+            if self.notification_ttl == 0 {
+                self.notification = None;
+            } else {
+                self.notification_ttl -= 1;
+            }
         }
     }
 
