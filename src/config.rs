@@ -66,18 +66,31 @@ fn cache_path() -> PathBuf {
 /// Load the cached speaker IP from the state file.
 pub(crate) fn load_cached_ip() -> Option<String> {
     let path = cache_path();
-    let contents = std::fs::read_to_string(&path).ok()?;
-    let ip = contents.trim().to_string();
-    if ip.is_empty() { None } else { Some(ip) }
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => {
+            let ip = contents.trim().to_string();
+            if ip.is_empty() { None } else { Some(ip) }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            tracing::warn!("Failed to read cached speaker IP from {}: {e}", path.display());
+            None
+        }
+    }
 }
 
 /// Save a speaker IP to the state file for next launch.
 pub(crate) fn save_cached_ip(ip: &std::net::IpAddr) {
     let path = cache_path();
     if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("Failed to create cache dir {}: {e}", parent.display());
+            return;
+        }
     }
-    let _ = std::fs::write(&path, ip.to_string());
+    if let Err(e) = std::fs::write(&path, ip.to_string()) {
+        tracing::warn!("Failed to save cached speaker IP to {}: {e}", path.display());
+    }
 }
 
 #[cfg(test)]

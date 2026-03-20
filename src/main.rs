@@ -195,12 +195,20 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
 }
 
 /// Try the cached speaker IP — quick probe to see if the speaker is still there.
+/// Uses a short 2-second timeout so fallback to discovery is fast.
 async fn try_cached_ip() -> Option<IpAddr> {
     let cached = config::load_cached_ip()?;
     let ip: IpAddr = cached.parse().ok()?;
     eprintln!("Trying cached speaker {ip}...");
-    let client = KefClient::new(ip);
-    if client.fetch_full_state().await.is_ok() {
+
+    // Quick probe with short timeout — don't make the user wait
+    let probe_client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(1))
+        .timeout(Duration::from_secs(2))
+        .build()
+        .ok()?;
+    let url = format!("http://{ip}/api/getData?path=settings%3A%2FdeviceName&roles=value");
+    if probe_client.get(&url).send().await.is_ok() {
         Some(ip)
     } else {
         tracing::debug!("Cached speaker {ip} unreachable, falling back to discovery");
@@ -298,6 +306,7 @@ fn require_speaker(ip: Option<&str>) -> String {
         return s.to_string();
     }
     if let Some(cached) = config::load_cached_ip() {
+        eprintln!("Using cached speaker {cached} (use --speaker to override)");
         return cached;
     }
     eprintln!(
