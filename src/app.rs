@@ -15,12 +15,6 @@ pub(crate) enum Action {
     SetVolume(i32),
     ToggleMute(bool),
     SetSource(Source),
-    Play,
-    Pause,
-    NextTrack,
-    PreviousTrack,
-    SeekForward,
-    SeekBackward,
     SetCableMode,
     SetStandbyMode(StandbyMode),
     SetMaxVolume(i32),
@@ -93,11 +87,6 @@ pub(crate) struct SpeakerState {
     pub(crate) front_led: bool,
     pub(crate) startup_tone: bool,
     pub(crate) eq_profile: EqProfile,
-    pub(crate) artist: Option<String>,
-    pub(crate) track: Option<String>,
-    pub(crate) duration: Option<u32>,
-    pub(crate) position: Option<u32>,
-    pub(crate) playing: bool,
 }
 
 impl Default for SpeakerState {
@@ -117,11 +106,6 @@ impl Default for SpeakerState {
             front_led: true,
             startup_tone: true,
             eq_profile: EqProfile::default(),
-            artist: None,
-            track: None,
-            duration: None,
-            position: None,
-            playing: false,
         }
     }
 }
@@ -156,11 +140,6 @@ impl SpeakerState {
                 sub_crossover: 80,
                 phase_correction: true,
             },
-            artist: Some("Nils Frahm".to_string()),
-            track: Some("Says".to_string()),
-            duration: Some(582),
-            position: Some(127),
-            playing: true,
         }
     }
 }
@@ -266,13 +245,6 @@ impl App {
     }
 
     pub(crate) fn tick(&mut self) {
-        if self.speaker.playing
-            && let (Some(pos), Some(dur)) = (self.speaker.position, self.speaker.duration)
-            && pos < dur
-        {
-            self.speaker.position = Some(pos + 1);
-        }
-
         // Auto-dismiss notifications
         if self.notification.is_some() {
             if self.notification_ttl == 0 {
@@ -334,24 +306,6 @@ impl App {
                     self.speaker.volume -= 1;
                 }
                 return Some(Action::SetVolume(self.speaker.volume));
-            }
-            KeyCode::Char(' ') => {
-                self.speaker.playing = !self.speaker.playing;
-                return if self.speaker.playing {
-                    Some(Action::Play)
-                } else {
-                    Some(Action::Pause)
-                };
-            }
-            KeyCode::Char('n') if self.focus == Focus::Sidebar => {
-                return Some(Action::NextTrack);
-            }
-            KeyCode::Char('p') if self.focus == Focus::Sidebar => {
-                return Some(Action::PreviousTrack);
-            }
-            KeyCode::Char('f') => return Some(Action::SeekForward),
-            KeyCode::Char('b') if self.focus == Focus::Sidebar => {
-                return Some(Action::SeekBackward)
             }
             _ => {}
         }
@@ -699,41 +653,6 @@ mod tests {
     }
 
     #[test]
-    fn space_toggles_play_pause() {
-        let mut a = app();
-        a.speaker.playing = true;
-        let action = a.handle_key(key(KeyCode::Char(' ')));
-        assert!(!a.speaker.playing);
-        assert!(matches!(action, Some(Action::Pause)));
-
-        let action = a.handle_key(key(KeyCode::Char(' ')));
-        assert!(a.speaker.playing);
-        assert!(matches!(action, Some(Action::Play)));
-    }
-
-    // -- Tick --
-
-    #[test]
-    fn tick_increments_position() {
-        let mut a = app();
-        a.speaker.playing = true;
-        a.speaker.position = Some(10);
-        a.speaker.duration = Some(100);
-        a.tick();
-        assert_eq!(a.speaker.position, Some(11));
-    }
-
-    #[test]
-    fn tick_stops_at_duration() {
-        let mut a = app();
-        a.speaker.playing = true;
-        a.speaker.position = Some(100);
-        a.speaker.duration = Some(100);
-        a.tick();
-        assert_eq!(a.speaker.position, Some(100));
-    }
-
-    #[test]
     fn notification_auto_dismisses() {
         let mut a = app();
         a.set_notification("test".to_string());
@@ -844,39 +763,6 @@ mod tests {
         };
         a.handle_key(ctrl_c);
         assert!(a.should_quit);
-    }
-
-    // -- Seek / Track --
-
-    #[test]
-    fn seek_forward_returns_action() {
-        let mut a = app();
-        let action = a.handle_key(key(KeyCode::Char('f')));
-        assert!(matches!(action, Some(Action::SeekForward)));
-    }
-
-    #[test]
-    fn seek_backward_from_sidebar() {
-        let mut a = app();
-        assert_eq!(a.focus, Focus::Sidebar);
-        let action = a.handle_key(key(KeyCode::Char('b')));
-        assert!(matches!(action, Some(Action::SeekBackward)));
-    }
-
-    #[test]
-    fn next_track_from_sidebar() {
-        let mut a = app();
-        assert_eq!(a.focus, Focus::Sidebar);
-        let action = a.handle_key(key(KeyCode::Char('n')));
-        assert!(matches!(action, Some(Action::NextTrack)));
-    }
-
-    #[test]
-    fn prev_track_from_sidebar() {
-        let mut a = app();
-        assert_eq!(a.focus, Focus::Sidebar);
-        let action = a.handle_key(key(KeyCode::Char('p')));
-        assert!(matches!(action, Some(Action::PreviousTrack)));
     }
 
     // -- Source panel --

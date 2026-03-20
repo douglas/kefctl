@@ -13,7 +13,7 @@ use crate::ui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App) {
     let theme = &app.theme;
-    let area = centered_rect(60, 28, frame.area());
+    let area = centered_rect(60, 22, frame.area());
 
     frame.render_widget(Clear, area);
 
@@ -30,11 +30,6 @@ pub fn draw(frame: &mut Frame, app: &App) {
         binding("h / ←", "Focus sidebar / back", theme),
         binding("l / → / Enter", "Focus main panel / select", theme),
         binding("Esc", "Back to sidebar", theme),
-        Line::raw(""),
-        heading("Playback", theme),
-        binding("Space", "Play / pause", theme),
-        binding("n / p", "Next / previous track", theme),
-        binding("f / b", "Seek forward / backward 10s", theme),
         Line::raw(""),
         heading("Volume", theme),
         binding("+ / -", "Volume up / down", theme),

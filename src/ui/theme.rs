@@ -20,8 +20,6 @@ pub struct Theme {
     pub status_warn: Color,
     pub status_error: Color,
     pub status_demo: Color,
-    pub progress_filled: Color,
-    pub progress_empty: Color,
     pub badge_bg: Color,
 }
 
@@ -38,8 +36,6 @@ impl Default for Theme {
             status_warn: Color::Yellow,
             status_error: Color::Red,
             status_demo: Color::Magenta,
-            progress_filled: Color::Cyan,
-            progress_empty: Color::DarkGray,
             badge_bg: Color::DarkGray,
         }
     }
@@ -135,8 +131,6 @@ fn load_omarchy() -> Option<Theme> {
         status_warn: color3,
         status_error: color1,
         status_demo: Color::Magenta,
-        progress_filled: accent,
-        progress_empty: color8,
         badge_bg: color8,
     })
 }

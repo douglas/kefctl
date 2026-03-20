@@ -226,12 +226,6 @@ fn dispatch_action(
             Action::SetVolume(v) => client.set_volume(v).await,
             Action::ToggleMute(m) => client.set_mute(m).await,
             Action::SetSource(s) => client.set_source(s).await,
-            Action::Play => client.play().await,
-            Action::Pause => client.pause().await,
-            Action::NextTrack => client.next_track().await,
-            Action::PreviousTrack => client.previous_track().await,
-            Action::SeekForward => client.seek(10).await,
-            Action::SeekBackward => client.seek(-10).await,
             Action::SetCableMode => Ok(()), // Cable mode is read-only in practice
             Action::SetStandbyMode(m) => client.set_standby_mode(m).await,
             Action::SetMaxVolume(v) => {

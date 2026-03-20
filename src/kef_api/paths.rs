@@ -11,6 +11,4 @@ pub const STANDBY_MODE: &str = "settings:/kef/host/standbyMode";
 pub const MAX_VOLUME: &str = "settings:/kef/host/maximumVolume";
 pub const FRONT_LED: &str = "settings:/kef/host/disableFrontStandbyLED";
 pub const STARTUP_TONE: &str = "settings:/kef/host/startupTone";
-pub const PLAYER_DATA: &str = "player:player/data";
-pub const PLAYER_CONTROL: &str = "player:player/control";
 pub const SPEAKER_STATUS: &str = "settings:/kef/host/speakerStatus";

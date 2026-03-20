@@ -170,6 +170,7 @@ impl ApiValue {
         ApiValue::I32 { value }
     }
 
+    #[cfg(test)]
     pub fn string(value: impl Into<String>) -> Self {
         ApiValue::String {
             value: value.into(),

@@ -126,7 +126,6 @@ async fn speaker_poll_loop(
     // Subscribe to key state changes
     let paths = &[
         api::VOLUME,
-        api::PLAYER_DATA,
         api::SOURCE,
         api::SPEAKER_STATUS,
         api::MUTE,

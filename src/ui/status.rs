@@ -1,27 +1,22 @@
-//! Status panel: speaker info, now playing, progress bar.
+//! Status panel: speaker info and settings summary.
 
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::{LineGauge, Paragraph},
+    widgets::Paragraph,
 };
 
 use crate::app::App;
-use crate::ui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::vertical([
         Constraint::Min(3),
         Constraint::Min(3),
-        Constraint::Min(8),
     ])
     .split(area);
 
     draw_speaker_info(frame, app, chunks[0]);
     draw_settings_summary(frame, app, chunks[1]);
-    draw_now_playing(frame, app, chunks[2]);
 }
 
 fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
@@ -48,101 +43,6 @@ fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
         }
         frame.render_widget(Paragraph::new(theme.info_row(label, value)), rows[i]);
     }
-}
-
-fn draw_now_playing(frame: &mut Frame, app: &App, area: Rect) {
-    let theme = &app.theme;
-    let s = &app.speaker;
-    let block = theme.section_block(" Now Playing ");
-
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-
-    let chunks = Layout::vertical([
-        Constraint::Min(1),    // track info (fills space)
-        Constraint::Length(1), // progress bar
-        Constraint::Length(1), // controls hint
-    ])
-    .split(inner);
-
-    // Track info — centered vertically in the available space
-    let artist = s.artist.as_deref().unwrap_or("—");
-    let track = s.track.as_deref().unwrap_or("No track");
-    let state_icon = if s.playing { "▶" } else { "⏸" };
-
-    let track_lines = vec![
-        Line::raw(""),
-        Line::from(vec![
-            Span::styled(
-                format!("  {state_icon}  "),
-                Style::default().fg(theme.accent),
-            ),
-            Span::styled(
-                track,
-                Style::default()
-                    .fg(theme.fg)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(Span::styled(
-            format!("     {artist}"),
-            Style::default().fg(theme.fg_dim),
-        )),
-    ];
-    frame.render_widget(Paragraph::new(track_lines), chunks[0]);
-
-    // Progress bar
-    let (position, duration) = (s.position.unwrap_or(0), s.duration.unwrap_or(0));
-    let ratio = if duration > 0 {
-        (f64::from(position) / f64::from(duration)).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    let time_label = format!(
-        " {}:{:02} / {}:{:02}",
-        position / 60,
-        position % 60,
-        duration / 60,
-        duration % 60
-    );
-    let gauge = LineGauge::default()
-        .label(time_label)
-        .ratio(ratio)
-        .filled_style(Style::default().fg(theme.progress_filled))
-        .unfilled_style(Style::default().fg(theme.progress_empty));
-    frame.render_widget(gauge, chunks[1]);
-
-    // Controls hint
-    draw_controls_hint(frame, theme, chunks[2]);
-}
-
-fn draw_controls_hint(frame: &mut Frame, theme: &Theme, area: Rect) {
-    let pairs = [
-        ("Space", "play/pause"),
-        ("n/p", "next/prev"),
-        ("f/b", "seek"),
-        ("+/-", "volume"),
-    ];
-
-    let mut spans = Vec::new();
-    spans.push(Span::raw(" "));
-    for (i, (key, desc)) in pairs.iter().enumerate() {
-        if i > 0 {
-            spans.push(Span::styled(" │ ", Style::default().fg(theme.fg_dim)));
-        }
-        spans.push(Span::styled(
-            *key,
-            Style::default()
-                .fg(theme.accent_secondary)
-                .add_modifier(Modifier::BOLD),
-        ));
-        spans.push(Span::styled(
-            format!(" {desc}"),
-            Style::default().fg(theme.fg_dim),
-        ));
-    }
-
-    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
@@ -184,6 +84,9 @@ fn draw_settings_summary(frame: &mut Frame, app: &App, area: Rect) {
         if i >= rows.len() {
             break;
         }
-        frame.render_widget(Paragraph::new(theme.info_row(label, value)), rows[i]);
+        frame.render_widget(
+            Paragraph::new(theme.info_row(label, value)),
+            rows[i],
+        );
     }
 }

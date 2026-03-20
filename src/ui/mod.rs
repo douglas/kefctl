@@ -89,9 +89,9 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     // Keybinding hints — responsive based on width
     let width = area.width as usize;
     let badges: &[(&str, &str)] = &[
-        ("Space", "play/pause"),
         ("+/-", "vol"),
         ("m", "mute"),
+        ("Tab", "panel"),
     ];
 
     if width > 50 {
@@ -169,7 +169,7 @@ mod tests {
         let buf = render_app(&mut app, 80, 24);
         let text = buffer_text(&buf);
         assert!(text.contains("Living Room LSX II"));
-        assert!(text.contains("Now Playing"));
+        assert!(text.contains("Settings"));
     }
 
     #[test]

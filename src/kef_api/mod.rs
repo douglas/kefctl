@@ -2,7 +2,6 @@
 
 pub(crate) mod events;
 pub(crate) mod paths;
-pub(crate) mod playback;
 pub(crate) mod settings;
 pub(crate) mod source;
 pub(crate) mod types;
@@ -131,11 +130,6 @@ impl KefClient {
             front_led: !front_led_disabled,
             startup_tone,
             eq_profile: types::EqProfile::default(),
-            artist: None,
-            track: None,
-            duration: None,
-            position: None,
-            playing: false,
         })
     }
 }
