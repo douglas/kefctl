@@ -1,3 +1,5 @@
+//! mDNS speaker discovery via `_kef-info._tcp.local.`.
+
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -6,7 +8,7 @@ use mdns_sd::{ServiceDaemon, ServiceEvent};
 use crate::app::DiscoveredSpeaker;
 use crate::error::KefError;
 
-pub async fn discover_speakers(
+pub(crate) async fn discover_speakers(
     timeout: Duration,
 ) -> Result<Vec<DiscoveredSpeaker>, KefError> {
     let mdns = ServiceDaemon::new().map_err(|e| KefError::Discovery(e.to_string()))?;

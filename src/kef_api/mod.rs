@@ -1,10 +1,12 @@
-pub mod events;
-pub mod paths;
-pub mod playback;
-pub mod settings;
-pub mod source;
-pub mod types;
-pub mod volume;
+//! KEF HTTP API client — `KefClient`, `get_data`/`set_data`, typed extraction.
+
+pub(crate) mod events;
+pub(crate) mod paths;
+pub(crate) mod playback;
+pub(crate) mod settings;
+pub(crate) mod source;
+pub(crate) mod types;
+pub(crate) mod volume;
 
 use std::net::IpAddr;
 use std::time::Duration;
@@ -15,7 +17,7 @@ use crate::app::SpeakerState;
 use crate::error::KefError;
 use types::{ApiValue, GetDataResponse, SetDataRequest};
 
-pub struct KefClient {
+pub(crate) struct KefClient {
     base_url: String,
     ip: IpAddr,
     client: Client,

@@ -1,7 +1,9 @@
+//! Async event multiplexer: terminal input, tick timer, speaker polling, SIGUSR1.
+
 use std::sync::Arc;
 use std::time::Duration;
 
-use crossterm::event::{Event as CrosstermEvent, EventStream, KeyEvent};
+use crossterm::event::{Event as CrosstermEvent, EventStream, KeyEvent, KeyEventKind};
 use futures::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -11,7 +13,7 @@ use crate::kef_api::KefClient;
 use crate::kef_api::paths as api;
 
 #[derive(Debug)]
-pub enum Event {
+pub(crate) enum Event {
     Key(KeyEvent),
     Resize,
     Tick,
@@ -20,14 +22,14 @@ pub enum Event {
     ThemeChanged,
 }
 
-pub struct EventHandler {
+pub(crate) struct EventHandler {
     rx: mpsc::UnboundedReceiver<Event>,
     tx: mpsc::UnboundedSender<Event>,
     cancel: CancellationToken,
 }
 
 impl EventHandler {
-    pub fn new(tick_rate: Duration, client: Option<Arc<KefClient>>) -> Self {
+    pub(crate) fn new(tick_rate: Duration, client: Option<Arc<KefClient>>) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
 
@@ -48,7 +50,9 @@ impl EventHandler {
                     }
                     event = reader.next() => {
                         match event {
-                            Some(Ok(CrosstermEvent::Key(key))) => {
+                            Some(Ok(CrosstermEvent::Key(key)))
+                                if key.kind == KeyEventKind::Press =>
+                            {
                                 if tx_term.send(Event::Key(key)).is_err() {
                                     break;
                                 }
@@ -101,15 +105,15 @@ impl EventHandler {
         Self { rx, tx, cancel }
     }
 
-    pub async fn next(&mut self) -> Option<Event> {
+    pub(crate) async fn next(&mut self) -> Option<Event> {
         self.rx.recv().await
     }
 
-    pub fn sender(&self) -> mpsc::UnboundedSender<Event> {
+    pub(crate) fn sender(&self) -> mpsc::UnboundedSender<Event> {
         self.tx.clone()
     }
 
-    pub fn shutdown(&self) {
+    pub(crate) fn shutdown(&self) {
         self.cancel.cancel();
     }
 }

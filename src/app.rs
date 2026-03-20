@@ -1,3 +1,5 @@
+//! Application state, keyboard handling, and action dispatch.
+
 use std::net::IpAddr;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -9,7 +11,7 @@ use crate::kef_api::types::{
 use crate::ui::theme::Theme;
 
 #[derive(Debug, Clone)]
-pub enum Action {
+pub(crate) enum Action {
     SetVolume(i32),
     ToggleMute(bool),
     SetSource(Source),
@@ -27,7 +29,7 @@ pub enum Action {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Panel {
+pub(crate) enum Panel {
     #[default]
     Status,
     Source,
@@ -37,7 +39,7 @@ pub enum Panel {
 }
 
 impl Panel {
-    pub const ALL: &[Panel] = &[
+    pub(crate) const ALL: &[Panel] = &[
         Panel::Status,
         Panel::Source,
         Panel::Eq,
@@ -45,7 +47,7 @@ impl Panel {
         Panel::Network,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             Panel::Status => "Status",
             Panel::Source => "Source",
@@ -55,20 +57,20 @@ impl Panel {
         }
     }
 
-    pub fn index(self) -> usize {
+    pub(crate) fn index(self) -> usize {
         Panel::ALL.iter().position(|&p| p == self).unwrap_or(0)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ConnectionState {
+pub(crate) enum ConnectionState {
     #[default]
     Disconnected,
     Connected,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Focus {
+pub(crate) enum Focus {
     #[default]
     Sidebar,
     Main,
@@ -76,26 +78,26 @@ pub enum Focus {
 
 #[allow(clippy::struct_excessive_bools)] // mirrors KEF API fields
 #[derive(Debug, Clone)]
-pub struct SpeakerState {
-    pub name: String,
-    pub model: String,
-    pub firmware: String,
-    pub ip: IpAddr,
-    pub mac: String,
-    pub source: Source,
-    pub volume: i32,
-    pub muted: bool,
-    pub cable_mode: CableMode,
-    pub standby_mode: StandbyMode,
-    pub max_volume: i32,
-    pub front_led: bool,
-    pub startup_tone: bool,
-    pub eq_profile: EqProfile,
-    pub artist: Option<String>,
-    pub track: Option<String>,
-    pub duration: Option<u32>,
-    pub position: Option<u32>,
-    pub playing: bool,
+pub(crate) struct SpeakerState {
+    pub(crate) name: String,
+    pub(crate) model: String,
+    pub(crate) firmware: String,
+    pub(crate) ip: IpAddr,
+    pub(crate) mac: String,
+    pub(crate) source: Source,
+    pub(crate) volume: i32,
+    pub(crate) muted: bool,
+    pub(crate) cable_mode: CableMode,
+    pub(crate) standby_mode: StandbyMode,
+    pub(crate) max_volume: i32,
+    pub(crate) front_led: bool,
+    pub(crate) startup_tone: bool,
+    pub(crate) eq_profile: EqProfile,
+    pub(crate) artist: Option<String>,
+    pub(crate) track: Option<String>,
+    pub(crate) duration: Option<u32>,
+    pub(crate) position: Option<u32>,
+    pub(crate) playing: bool,
 }
 
 impl Default for SpeakerState {
@@ -125,7 +127,7 @@ impl Default for SpeakerState {
 }
 
 impl SpeakerState {
-    pub fn demo() -> Self {
+    pub(crate) fn demo() -> Self {
         Self {
             name: "Living Room LSX II".to_string(),
             model: "LSX II".to_string(),
@@ -164,32 +166,32 @@ impl SpeakerState {
 }
 
 #[derive(Debug)]
-pub struct DiscoveredSpeaker {
-    pub name: String,
-    pub ip: IpAddr,
-    pub port: u16,
+pub(crate) struct DiscoveredSpeaker {
+    pub(crate) name: String,
+    pub(crate) ip: IpAddr,
+    pub(crate) port: u16,
 }
 
-pub struct App {
-    pub speaker: SpeakerState,
-    pub panel: Panel,
-    pub connection: ConnectionState,
-    pub focus: Focus,
-    pub sidebar_state: ListState,
-    pub source_list_state: ListState,
-    pub eq_focus: usize,
-    pub settings_focus: usize,
-    pub network_speakers: Vec<DiscoveredSpeaker>,
-    pub notification: Option<String>,
-    pub notification_ttl: u8,
-    pub show_help: bool,
-    pub should_quit: bool,
-    pub demo: bool,
-    pub theme: Theme,
+pub(crate) struct App {
+    pub(crate) speaker: SpeakerState,
+    pub(crate) panel: Panel,
+    pub(crate) connection: ConnectionState,
+    pub(crate) focus: Focus,
+    pub(crate) sidebar_state: ListState,
+    pub(crate) source_list_state: ListState,
+    pub(crate) eq_focus: usize,
+    pub(crate) settings_focus: usize,
+    pub(crate) network_speakers: Vec<DiscoveredSpeaker>,
+    pub(crate) notification: Option<String>,
+    pub(crate) notification_ttl: u8,
+    pub(crate) show_help: bool,
+    pub(crate) should_quit: bool,
+    pub(crate) demo: bool,
+    pub(crate) theme: Theme,
 }
 
 impl App {
-    pub fn new_live(state: SpeakerState) -> Self {
+    pub(crate) fn new_live(state: SpeakerState) -> Self {
         let mut sidebar_state = ListState::default();
         sidebar_state.select(Some(0));
         let mut source_list_state = ListState::default();
@@ -214,7 +216,7 @@ impl App {
         }
     }
 
-    pub fn new_demo() -> Self {
+    pub(crate) fn new_demo() -> Self {
         let mut sidebar_state = ListState::default();
         sidebar_state.select(Some(0));
         let mut source_list_state = ListState::default();
@@ -239,22 +241,22 @@ impl App {
         }
     }
 
-    pub fn set_notification(&mut self, msg: String) {
+    pub(crate) fn set_notification(&mut self, msg: String) {
         self.notification = Some(msg);
         self.notification_ttl = 3;
     }
 
-    pub fn select_panel(&mut self, panel: Panel) {
+    pub(crate) fn select_panel(&mut self, panel: Panel) {
         self.panel = panel;
         self.sidebar_state.select(Some(panel.index()));
     }
 
-    pub fn next_panel(&mut self) {
+    pub(crate) fn next_panel(&mut self) {
         let idx = (self.panel.index() + 1) % Panel::ALL.len();
         self.select_panel(Panel::ALL[idx]);
     }
 
-    pub fn prev_panel(&mut self) {
+    pub(crate) fn prev_panel(&mut self) {
         let idx = if self.panel.index() == 0 {
             Panel::ALL.len() - 1
         } else {
@@ -263,7 +265,7 @@ impl App {
         self.select_panel(Panel::ALL[idx]);
     }
 
-    pub fn tick(&mut self) {
+    pub(crate) fn tick(&mut self) {
         if self.speaker.playing
             && let (Some(pos), Some(dur)) = (self.speaker.position, self.speaker.duration)
             && pos < dur
@@ -281,7 +283,8 @@ impl App {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> Option<Action> {
+    #[must_use]
+    pub(crate) fn handle_key(&mut self, key: KeyEvent) -> Option<Action> {
         // Help overlay intercepts all keys
         if self.show_help {
             match key.code {
@@ -559,6 +562,7 @@ impl App {
 }
 
 #[cfg(test)]
+#[allow(unused_must_use)]
 mod tests {
     use super::*;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};

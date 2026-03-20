@@ -1,3 +1,5 @@
+//! TOML config file loading from `~/.config/kefctl/config.toml`.
+
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -5,22 +7,22 @@ use crate::error::KefError;
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
-pub struct Config {
-    pub speaker: SpeakerConfig,
-    pub ui: UiConfig,
+pub(crate) struct Config {
+    pub(crate) speaker: SpeakerConfig,
+    pub(crate) ui: UiConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
-pub struct SpeakerConfig {
-    pub ip: Option<String>,
-    pub name: Option<String>,
+pub(crate) struct SpeakerConfig {
+    pub(crate) ip: Option<String>,
+    pub(crate) name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
-pub struct UiConfig {
-    pub refresh_ms: u64,
+pub(crate) struct UiConfig {
+    pub(crate) refresh_ms: u64,
 }
 
 impl Default for UiConfig {
@@ -30,7 +32,7 @@ impl Default for UiConfig {
 }
 
 impl Config {
-    pub fn load() -> Result<Self, KefError> {
+    pub(crate) fn load() -> Result<Self, KefError> {
         let path = Self::config_path();
         match std::fs::read_to_string(&path) {
             Ok(contents) => Self::load_from_str(&contents),
@@ -39,7 +41,7 @@ impl Config {
         }
     }
 
-    pub fn load_from_str(s: &str) -> Result<Self, KefError> {
+    pub(crate) fn load_from_str(s: &str) -> Result<Self, KefError> {
         Ok(toml::from_str(s)?)
     }
 

@@ -1,3 +1,5 @@
+//! Terminal setup/teardown (alternate screen, raw mode).
+
 use std::io::{self, stdout};
 
 use crossterm::{
@@ -6,16 +8,16 @@ use crossterm::{
 };
 use ratatui::{Terminal, prelude::CrosstermBackend};
 
-pub type Tui = Terminal<CrosstermBackend<io::Stdout>>;
+pub(crate) type Tui = Terminal<CrosstermBackend<io::Stdout>>;
 
-pub fn init() -> io::Result<Tui> {
+pub(crate) fn init() -> io::Result<Tui> {
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout());
     Terminal::new(backend)
 }
 
-pub fn restore() -> io::Result<()> {
+pub(crate) fn restore() -> io::Result<()> {
     disable_raw_mode()?;
     execute!(stdout(), LeaveAlternateScreen)?;
     Ok(())
