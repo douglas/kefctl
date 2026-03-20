@@ -563,3 +563,266 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    fn app() -> App {
+        App::new_demo()
+    }
+
+    // -- Panel navigation --
+
+    #[test]
+    fn next_panel_cycles() {
+        let mut a = app();
+        assert_eq!(a.panel, Panel::Status);
+        a.next_panel();
+        assert_eq!(a.panel, Panel::Source);
+        a.next_panel();
+        assert_eq!(a.panel, Panel::Eq);
+        a.next_panel();
+        assert_eq!(a.panel, Panel::Settings);
+        a.next_panel();
+        assert_eq!(a.panel, Panel::Network);
+        a.next_panel();
+        assert_eq!(a.panel, Panel::Status); // wraps
+    }
+
+    #[test]
+    fn prev_panel_cycles() {
+        let mut a = app();
+        assert_eq!(a.panel, Panel::Status);
+        a.prev_panel();
+        assert_eq!(a.panel, Panel::Network); // wraps backward
+        a.prev_panel();
+        assert_eq!(a.panel, Panel::Settings);
+    }
+
+    #[test]
+    fn sidebar_state_syncs() {
+        let mut a = app();
+        a.select_panel(Panel::Eq);
+        assert_eq!(a.sidebar_state.selected(), Some(Panel::Eq.index()));
+        a.select_panel(Panel::Network);
+        assert_eq!(a.sidebar_state.selected(), Some(Panel::Network.index()));
+    }
+
+    // -- Focus --
+
+    #[test]
+    fn tab_moves_to_next_panel() {
+        let mut a = app();
+        a.handle_key(key(KeyCode::Tab));
+        assert_eq!(a.panel, Panel::Source);
+    }
+
+    #[test]
+    fn enter_focuses_main() {
+        let mut a = app();
+        assert_eq!(a.focus, Focus::Sidebar);
+        a.handle_key(key(KeyCode::Enter));
+        assert_eq!(a.focus, Focus::Main);
+    }
+
+    #[test]
+    fn esc_returns_to_sidebar() {
+        let mut a = app();
+        a.focus = Focus::Main;
+        a.handle_key(key(KeyCode::Esc));
+        assert_eq!(a.focus, Focus::Sidebar);
+    }
+
+    #[test]
+    fn help_overlay_intercepts_keys() {
+        let mut a = app();
+        a.handle_key(key(KeyCode::Char('?')));
+        assert!(a.show_help);
+
+        // Other keys don't do anything while help is open
+        a.handle_key(key(KeyCode::Char('q')));
+        assert!(!a.should_quit); // q closes help, doesn't quit
+        assert!(!a.show_help);
+
+        // Re-open and close with Esc
+        a.handle_key(key(KeyCode::Char('?')));
+        assert!(a.show_help);
+        a.handle_key(key(KeyCode::Esc));
+        assert!(!a.show_help);
+    }
+
+    // -- Volume --
+
+    #[test]
+    fn volume_up_clamped_at_max() {
+        let mut a = app();
+        a.speaker.volume = a.speaker.max_volume;
+        a.handle_key(key(KeyCode::Char('+')));
+        assert_eq!(a.speaker.volume, a.speaker.max_volume);
+    }
+
+    #[test]
+    fn volume_down_clamped_at_zero() {
+        let mut a = app();
+        a.speaker.volume = 0;
+        a.handle_key(key(KeyCode::Char('-')));
+        assert_eq!(a.speaker.volume, 0);
+    }
+
+    #[test]
+    fn volume_returns_action() {
+        let mut a = app();
+        a.speaker.volume = 50;
+        let action = a.handle_key(key(KeyCode::Char('+')));
+        assert!(matches!(action, Some(Action::SetVolume(51))));
+    }
+
+    // -- Mute / Playback --
+
+    #[test]
+    fn mute_toggles() {
+        let mut a = app();
+        assert!(!a.speaker.muted);
+        a.handle_key(key(KeyCode::Char('m')));
+        assert!(a.speaker.muted);
+        a.handle_key(key(KeyCode::Char('m')));
+        assert!(!a.speaker.muted);
+    }
+
+    #[test]
+    fn space_toggles_play_pause() {
+        let mut a = app();
+        a.speaker.playing = true;
+        let action = a.handle_key(key(KeyCode::Char(' ')));
+        assert!(!a.speaker.playing);
+        assert!(matches!(action, Some(Action::Pause)));
+
+        let action = a.handle_key(key(KeyCode::Char(' ')));
+        assert!(a.speaker.playing);
+        assert!(matches!(action, Some(Action::Play)));
+    }
+
+    // -- Tick --
+
+    #[test]
+    fn tick_increments_position() {
+        let mut a = app();
+        a.speaker.playing = true;
+        a.speaker.position = Some(10);
+        a.speaker.duration = Some(100);
+        a.tick();
+        assert_eq!(a.speaker.position, Some(11));
+    }
+
+    #[test]
+    fn tick_stops_at_duration() {
+        let mut a = app();
+        a.speaker.playing = true;
+        a.speaker.position = Some(100);
+        a.speaker.duration = Some(100);
+        a.tick();
+        assert_eq!(a.speaker.position, Some(100));
+    }
+
+    #[test]
+    fn notification_auto_dismisses() {
+        let mut a = app();
+        a.set_notification("test".to_string());
+        assert_eq!(a.notification_ttl, 3);
+        a.tick(); // ttl 3 -> 2
+        a.tick(); // ttl 2 -> 1
+        a.tick(); // ttl 1 -> 0
+        assert!(a.notification.is_some());
+        a.tick(); // ttl 0 -> cleared
+        assert!(a.notification.is_none());
+    }
+
+    // -- EQ adjustments --
+
+    #[test]
+    fn treble_clamped() {
+        let mut a = app();
+        a.focus = Focus::Main;
+        a.select_panel(Panel::Eq);
+        a.eq_focus = 1; // treble row
+        a.speaker.eq_profile.treble = 5.0;
+        a.eq_adjust(1);
+        assert_eq!(a.speaker.eq_profile.treble, 5.0); // clamped at max
+
+        a.speaker.eq_profile.treble = -5.0;
+        a.eq_adjust(-1);
+        assert_eq!(a.speaker.eq_profile.treble, -5.0); // clamped at min
+    }
+
+    #[test]
+    fn desk_mode_toggle_sequence() {
+        let mut a = app();
+        a.eq_focus = 3; // desk mode row
+        a.speaker.eq_profile.desk_mode = false;
+
+        a.eq_adjust(1); // off -> on
+        assert!(a.speaker.eq_profile.desk_mode);
+
+        a.eq_adjust(1); // adjust dB up
+        assert!(a.speaker.eq_profile.desk_mode);
+
+        // Drive dB down to minimum to turn off
+        a.speaker.eq_profile.desk_db = -5.5;
+        a.eq_adjust(-1); // -5.5 -> -6.0, turns off
+        assert!(!a.speaker.eq_profile.desk_mode);
+    }
+
+    // -- Settings cycling --
+
+    #[test]
+    fn standby_mode_cycles_all_variants() {
+        let mut a = app();
+        a.settings_focus = 1;
+        a.speaker.standby_mode = StandbyMode::TwentyMinutes;
+
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.standby_mode, StandbyMode::ThirtyMinutes);
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.standby_mode, StandbyMode::SixtyMinutes);
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.standby_mode, StandbyMode::Never);
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.standby_mode, StandbyMode::TwentyMinutes);
+    }
+
+    #[test]
+    fn max_volume_clamped() {
+        let mut a = app();
+        a.settings_focus = 2;
+
+        a.speaker.max_volume = 100;
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.max_volume, 100); // clamped at 100
+
+        a.speaker.max_volume = 10;
+        a.settings_cycle(-1);
+        assert_eq!(a.speaker.max_volume, 10); // clamped at 10
+    }
+
+    #[test]
+    fn led_toggles() {
+        let mut a = app();
+        a.settings_focus = 3;
+        assert!(a.speaker.front_led);
+        a.settings_cycle(1);
+        assert!(!a.speaker.front_led);
+        a.settings_cycle(1);
+        assert!(a.speaker.front_led);
+    }
+}
