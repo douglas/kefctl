@@ -1,3 +1,5 @@
+//! kefctl — TUI controller for KEF W2-platform speakers.
+#![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
 
 mod app;
@@ -126,7 +128,13 @@ async fn run_tui_live(ip_str: Option<String>, config: Config) {
 }
 
 async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: Duration) {
-    let mut terminal = tui::init().expect("failed to init terminal");
+    let mut terminal = match tui::init() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Failed to init terminal: {e}");
+            return;
+        }
+    };
 
     // Install panic hook that restores terminal
     let original_hook = std::panic::take_hook();
@@ -139,9 +147,12 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
     let event_tx = events.sender();
 
     loop {
-        terminal
-            .draw(|frame| ui::draw(frame, &mut app))
-            .expect("failed to draw");
+        if let Err(e) = terminal.draw(|frame| ui::draw(frame, &mut app)) {
+            events.shutdown();
+            let _ = tui::restore();
+            eprintln!("Draw failed: {e}");
+            return;
+        }
 
         match events.next().await {
             Some(Event::Key(key)) => {
@@ -173,7 +184,9 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
     }
 
     events.shutdown();
-    tui::restore().expect("failed to restore terminal");
+    if let Err(e) = tui::restore() {
+        eprintln!("Failed to restore terminal: {e}");
+    }
 }
 
 fn dispatch_action(
