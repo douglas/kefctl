@@ -78,47 +78,17 @@ impl KefClient {
 
     pub async fn get_string(&self, path: &str) -> Result<String, KefError> {
         let data = self.get_data(path).await?;
-        match data.into_iter().next() {
-            Some(ApiValue::String { value }) => Ok(value),
-            Some(other) => Err(KefError::TypeMismatch {
-                expected: "string",
-                got: format!("{other:?}"),
-            }),
-            None => Err(KefError::TypeMismatch {
-                expected: "string",
-                got: "empty response".to_string(),
-            }),
-        }
+        extract_string(data)
     }
 
     pub async fn get_i32(&self, path: &str) -> Result<i32, KefError> {
         let data = self.get_data(path).await?;
-        match data.into_iter().next() {
-            Some(ApiValue::I32 { value }) => Ok(value),
-            Some(other) => Err(KefError::TypeMismatch {
-                expected: "i32",
-                got: format!("{other:?}"),
-            }),
-            None => Err(KefError::TypeMismatch {
-                expected: "i32",
-                got: "empty response".to_string(),
-            }),
-        }
+        extract_i32(data)
     }
 
     pub async fn get_bool(&self, path: &str) -> Result<bool, KefError> {
         let data = self.get_data(path).await?;
-        match data.into_iter().next() {
-            Some(ApiValue::Bool { value }) => Ok(value),
-            Some(other) => Err(KefError::TypeMismatch {
-                expected: "bool",
-                got: format!("{other:?}"),
-            }),
-            None => Err(KefError::TypeMismatch {
-                expected: "bool",
-                got: "empty response".to_string(),
-            }),
-        }
+        extract_bool(data)
     }
 
     pub async fn fetch_full_state(&self) -> Result<SpeakerState, KefError> {
@@ -160,5 +130,126 @@ impl KefClient {
             position: None,
             playing: false,
         })
+    }
+}
+
+// Pure extraction functions — testable without HTTP
+fn extract_string(data: GetDataResponse) -> Result<String, KefError> {
+    match data.into_iter().next() {
+        Some(ApiValue::String { value }) => Ok(value),
+        Some(other) => Err(KefError::TypeMismatch {
+            expected: "string",
+            got: format!("{other:?}"),
+        }),
+        None => Err(KefError::TypeMismatch {
+            expected: "string",
+            got: "empty response".to_string(),
+        }),
+    }
+}
+
+fn extract_i32(data: GetDataResponse) -> Result<i32, KefError> {
+    match data.into_iter().next() {
+        Some(ApiValue::I32 { value }) => Ok(value),
+        Some(other) => Err(KefError::TypeMismatch {
+            expected: "i32",
+            got: format!("{other:?}"),
+        }),
+        None => Err(KefError::TypeMismatch {
+            expected: "i32",
+            got: "empty response".to_string(),
+        }),
+    }
+}
+
+fn extract_bool(data: GetDataResponse) -> Result<bool, KefError> {
+    match data.into_iter().next() {
+        Some(ApiValue::Bool { value }) => Ok(value),
+        Some(other) => Err(KefError::TypeMismatch {
+            expected: "bool",
+            got: format!("{other:?}"),
+        }),
+        None => Err(KefError::TypeMismatch {
+            expected: "bool",
+            got: "empty response".to_string(),
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use types::Source;
+
+    #[test]
+    fn get_string_returns_string() {
+        let data = vec![ApiValue::string("hello")];
+        assert_eq!(extract_string(data).unwrap(), "hello");
+    }
+
+    #[test]
+    fn get_string_type_mismatch() {
+        let data = vec![ApiValue::i32(42)];
+        let err = extract_string(data).unwrap_err();
+        assert!(matches!(err, KefError::TypeMismatch { expected: "string", .. }));
+    }
+
+    #[test]
+    fn get_string_empty_response() {
+        let data: GetDataResponse = vec![];
+        let err = extract_string(data).unwrap_err();
+        assert!(matches!(err, KefError::TypeMismatch { expected: "string", .. }));
+    }
+
+    #[test]
+    fn get_i32_returns_i32() {
+        let data = vec![ApiValue::i32(50)];
+        assert_eq!(extract_i32(data).unwrap(), 50);
+    }
+
+    #[test]
+    fn get_i32_type_mismatch() {
+        let data = vec![ApiValue::string("nope")];
+        let err = extract_i32(data).unwrap_err();
+        assert!(matches!(err, KefError::TypeMismatch { expected: "i32", .. }));
+    }
+
+    #[test]
+    fn get_bool_returns_bool() {
+        let data = vec![ApiValue::bool(true)];
+        assert!(extract_bool(data).unwrap());
+    }
+
+    #[test]
+    fn get_bool_type_mismatch() {
+        let data = vec![ApiValue::string("nope")];
+        let err = extract_bool(data).unwrap_err();
+        assert!(matches!(err, KefError::TypeMismatch { expected: "bool", .. }));
+    }
+
+    #[test]
+    fn get_bool_empty_response() {
+        let data: GetDataResponse = vec![];
+        let err = extract_bool(data).unwrap_err();
+        assert!(matches!(err, KefError::TypeMismatch { expected: "bool", .. }));
+    }
+
+    #[test]
+    fn extract_ignores_extra_elements() {
+        // API returns array — we only use the first element
+        let data = vec![ApiValue::i32(10), ApiValue::i32(20)];
+        assert_eq!(extract_i32(data).unwrap(), 10);
+    }
+
+    #[test]
+    fn extract_source_from_physical_source() {
+        // Source extraction is in source.rs but test the pattern here
+        let data: GetDataResponse = vec![ApiValue::source(Source::Bluetooth)];
+        match data.into_iter().next() {
+            Some(ApiValue::PhysicalSource { value }) => {
+                assert_eq!(value, Source::Bluetooth);
+            }
+            _ => panic!("expected PhysicalSource"),
+        }
     }
 }
