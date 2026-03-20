@@ -9,11 +9,12 @@ mod tui;
 mod ui;
 
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
 
-use app::App;
+use app::{Action, App};
 use cli::{Cli, Commands};
 use config::Config;
 use event::{Event, EventHandler};
@@ -65,17 +66,71 @@ fn main() {
         None => {
             let rt = tokio::runtime::Runtime::new().unwrap();
             if cli.demo {
-                rt.block_on(run_tui(App::new_demo(), config));
+                rt.block_on(run_tui_demo(config));
             } else {
-                let _ip = speaker_ip;
-                eprintln!("TUI with live speaker not yet wired — use --demo for now");
-                std::process::exit(1);
+                let ip_str = speaker_ip.map(String::from);
+                rt.block_on(run_tui_live(ip_str, config));
             }
         }
     }
 }
 
-async fn run_tui(mut app: App, config: Config) {
+async fn run_tui_demo(config: Config) {
+    let app = App::new_demo();
+    let tick_rate = Duration::from_millis(config.ui.refresh_ms);
+    run_tui_loop(app, None, tick_rate).await;
+}
+
+async fn run_tui_live(ip_str: Option<String>, config: Config) {
+    // Resolve speaker IP: flag/config > mDNS discovery
+    let ip: IpAddr = if let Some(ref s) = ip_str {
+        s.parse().unwrap_or_else(|_| {
+            eprintln!("Invalid IP address: {s}");
+            std::process::exit(1);
+        })
+    } else {
+        eprintln!("Discovering speakers...");
+        match discovery::discover_speakers(Duration::from_secs(5)).await {
+            Ok(speakers) if speakers.len() == 1 => speakers[0].ip,
+            Ok(speakers) if speakers.is_empty() => {
+                eprintln!(
+                    "No KEF speakers found. Use --speaker <ip> or set ip in config."
+                );
+                std::process::exit(1);
+            }
+            Ok(speakers) => {
+                eprintln!("Multiple speakers found:");
+                for s in &speakers {
+                    eprintln!("  {} — {}", s.name, s.ip);
+                }
+                eprintln!("Use --speaker <ip> to select one.");
+                std::process::exit(1);
+            }
+            Err(e) => {
+                eprintln!("Discovery error: {e}");
+                std::process::exit(1);
+            }
+        }
+    };
+
+    let client = Arc::new(KefClient::new(ip));
+
+    // Fetch initial state
+    eprintln!("Connecting to {ip}...");
+    let state = match client.fetch_full_state().await {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Failed to connect: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let app = App::new_live(state);
+    let tick_rate = Duration::from_millis(config.ui.refresh_ms);
+    run_tui_loop(app, Some(client), tick_rate).await;
+}
+
+async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: Duration) {
     let mut terminal = tui::init().expect("failed to init terminal");
 
     // Install panic hook that restores terminal
@@ -85,8 +140,7 @@ async fn run_tui(mut app: App, config: Config) {
         original_hook(panic_info);
     }));
 
-    let tick_rate = Duration::from_millis(config.ui.refresh_ms);
-    let mut events = EventHandler::new(tick_rate);
+    let mut events = EventHandler::new(tick_rate, client.clone());
 
     loop {
         terminal
@@ -95,28 +149,62 @@ async fn run_tui(mut app: App, config: Config) {
 
         match events.next().await {
             Some(Event::Key(key)) => {
-                app.handle_key(key);
+                let action = app.handle_key(key);
                 if app.should_quit {
                     break;
+                }
+                if let (Some(action), Some(client)) = (action, client.as_ref()) {
+                    dispatch_action(client.clone(), action);
                 }
             }
             Some(Event::Tick) => {
                 app.tick();
             }
-            Some(Event::Resize(_, _)) => {
-                // Terminal auto-redraws on next loop
-            }
+            Some(Event::Resize(_, _)) => {}
             Some(Event::SpeakerUpdate(state)) => {
                 app.speaker = *state;
+                app.connection = app::ConnectionState::Connected;
             }
             Some(Event::SpeakerError(msg)) => {
                 app.notification = Some(msg);
+                app.connection = app::ConnectionState::Disconnected;
             }
             None => break,
         }
     }
 
     tui::restore().expect("failed to restore terminal");
+}
+
+fn dispatch_action(client: Arc<KefClient>, action: Action) {
+    tokio::spawn(async move {
+        let result = match action {
+            Action::SetVolume(v) => client.set_volume(v).await,
+            Action::ToggleMute(m) => client.set_mute(m).await,
+            Action::SetSource(s) => client.set_source(s).await,
+            Action::Play => client.play().await,
+            Action::Pause => client.pause().await,
+            Action::NextTrack => client.next_track().await,
+            Action::PreviousTrack => client.previous_track().await,
+            Action::SeekForward => client.seek(10).await,
+            Action::SeekBackward => client.seek(-10).await,
+            Action::SetCableMode(_) => Ok(()), // Cable mode is read-only in practice
+            Action::SetStandbyMode(m) => client.set_standby_mode(m).await,
+            Action::SetMaxVolume(v) => {
+                client
+                    .set_data(
+                        "settings:/kef/host/maximumVolume",
+                        kef_api::types::ApiValue::i32(v),
+                    )
+                    .await
+            }
+            Action::SetFrontLed(on) => client.set_front_led_disabled(!on).await,
+            Action::SetStartupTone(on) => client.set_startup_tone(on).await,
+        };
+        if let Err(e) = result {
+            tracing::warn!("API action failed: {e}");
+        }
+    });
 }
 
 async fn cmd_discover() {
