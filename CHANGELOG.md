@@ -2,6 +2,27 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Removed unused `color-eyre` dependency
+- Scoped tokio features (`rt-multi-thread`, `sync`, `time`, `signal`, `macros`) instead of `"full"`
+- API action errors now surface as TUI notifications via event channel (previously only logged)
+- Extracted pure `extract_string`/`extract_i32`/`extract_bool` functions in `kef_api/mod.rs` for testability
+- Fixed tilde `PathBuf` fallback in config (`~/` doesn't expand in `PathBuf::from`)
+
+### Added
+
+- GitHub Actions CI: clippy (`-D warnings`), test, and release build
+- `[profile.release]` with LTO, strip, `codegen-units = 1`
+- Graceful async shutdown via `CancellationToken` (`tokio-util`)
+- `KefError::TypeMismatch` variant for typed getter validation
+- `KefError::Config` variant for TOML parse errors
+- `kef_api/paths.rs` — API path string constants (replaces magic strings)
+- `theme.info_row()` and `theme.section_block()` UI helpers
+- 41 new tests (48 → 89): app state machine, UI rendering (TestBackend), error Display formats, API extraction, EqProfile serde, I64 roundtrip, config parsing
+
 ## [0.1.0] — 2026-03-20
 
 Initial release.
@@ -31,7 +52,7 @@ Initial release.
 
 - HTTP JSON client for KEF W2 platform (LSX II, LS50 Wireless II, LS60 Wireless)
 - Tagged union serde for `ApiValue` (`i32_`, `string_`, `bool_`, `kefPhysicalSource`, `kefStandbyMode`, `kefCableMode`)
-- Optimistic UI updates with async fire-and-forget API dispatch
+- Optimistic UI updates with async API dispatch
 - Event subscribe/poll with graceful timeout handling
 
 ### Configuration

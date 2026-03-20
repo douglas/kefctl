@@ -69,9 +69,13 @@ Press `?` in the app for the full keybindings overlay.
 See [docs/architecture.md](docs/architecture.md) for the full module map and data flow.
 
 ```
+.github/
+└── workflows/
+    └── ci.yml       # GitHub Actions CI (clippy, test, release build)
 src/
 ├── main.rs          # CLI parsing, TUI loop, action dispatch
 ├── app.rs           # App state, keyboard handling, Panel/Focus enums
+├── cli.rs           # CLI argument parsing (clap derive)
 ├── event.rs         # Async event loop: terminal, speaker polling, SIGUSR1
 ├── tui.rs           # Terminal init/restore
 ├── config.rs        # ~/.config/kefctl/config.toml loader
@@ -166,9 +170,11 @@ chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
 git clone https://github.com/douglas/kefctl.git
 cd kefctl
 cargo run -- --demo        # No speaker needed
-cargo test                 # Run tests
+cargo test                 # Run 89 tests (app state, UI rendering, types, API, errors, config)
 cargo clippy               # Lint
 ```
+
+GitHub Actions CI runs `clippy --all-targets -- -D warnings`, `cargo test`, and a release build on every push and PR.
 
 ### Testing against a real speaker
 

@@ -33,9 +33,12 @@ A Rust TUI application for fully managing KEF LSX II (W2 platform) speakers from
 
 ```
 src/
-├── main.rs              # Entry point, arg parsing, tokio runtime
+├── main.rs              # Entry point, TUI loop, action dispatch
 ├── app.rs               # Application state and state transitions
+├── cli.rs               # CLI argument parsing (clap derive)
 ├── event.rs             # Event loop: terminal keys + speaker poll events
+├── tui.rs               # Terminal setup/teardown (alternate screen, raw mode)
+├── error.rs             # KefError enum
 ├── ui/
 │   ├── mod.rs           # Top-level render: sidebar + main panel
 │   ├── sidebar.rs       # Sidebar widget
@@ -43,15 +46,17 @@ src/
 │   ├── source.rs        # Source selector panel
 │   ├── eq.rs            # EQ/DSP panel
 │   ├── settings.rs      # Settings panel
-│   └── network.rs       # Network/discovery panel
+│   ├── network.rs       # Network/discovery panel
+│   ├── help.rs          # Keybindings overlay
+│   └── theme.rs         # Theme struct, Omarchy loader, SIGUSR1 reload
 ├── kef_api/
-│   ├── mod.rs           # Client struct, connection management
+│   ├── mod.rs           # Client struct, connection management, extract_* functions
 │   ├── types.rs         # Request/response types (serde)
+│   ├── paths.rs         # API path string constants
 │   ├── playback.rs      # Play, pause, next, prev, seek
 │   ├── volume.rs        # Volume, mute, max volume
 │   ├── source.rs        # Source get/set
 │   ├── settings.rs      # Device settings (standby, cable, LED, etc.)
-│   ├── eq.rs            # EQ profiles, DSP params
 │   └── events.rs        # Event polling (pollQueue)
 ├── discovery.rs         # mDNS speaker discovery
 └── config.rs            # Config file parsing (~/.config/kefctl/config.toml)
@@ -67,7 +72,7 @@ Typed async HTTP client wrapping the KEF speaker's REST API. All methods return 
 enum KefError {
     Network(reqwest::Error),
     Api { status: u16, message: String },
-    Timeout,
+    TypeMismatch { expected: &'static str, got: String },
     Discovery(String),
     Config(toml::de::Error),
 }
@@ -126,7 +131,7 @@ Value types: `i32_`, `i64_`, `string_`, `bool_`, `kefPhysicalSource`, `kefSpeake
 
 ### 2. `discovery` — mDNS Speaker Discovery
 
-Uses `mdns-sd` crate to browse for `_http._tcp.local.` services, filtering results where the service name contains "KEF" (case-insensitive). The exact filter heuristic may need refinement during implementation by inspecting mDNS TXT records on a live network. Returns list of `(name, ip, port)` tuples. Times out after 5 seconds.
+Uses `mdns-sd` crate to browse for `_kef-info._tcp.local.` services. The exact filter heuristic may need refinement during implementation by inspecting mDNS TXT records on a live network. Returns list of `(name, ip, port)` tuples. Times out after 5 seconds.
 
 Falls back to `~/.config/kefctl/config.toml` if no speakers found or if a static IP is configured.
 
@@ -136,7 +141,7 @@ Falls back to `~/.config/kefctl/config.toml` if no speakers found or if a static
 struct App {
     speaker: SpeakerState,      // Current speaker state (all fields)
     panel: Panel,               // Active sidebar panel
-    connection: ConnectionState, // Connected / Disconnected / Connecting
+    connection: ConnectionState, // Connected / Disconnected
     // Per-panel state
     source_list: ListState,     // Source selector cursor
     eq_focus: usize,            // Which EQ parameter row is focused
@@ -166,7 +171,7 @@ struct SpeakerState {
     max_volume: i32,
     front_led: bool,
     startup_tone: bool,
-    eq_profile: String,
+    eq_profile: EqProfile,
     // Now playing
     artist: Option<String>,
     track: Option<String>,
@@ -178,7 +183,7 @@ struct SpeakerState {
 
 ### 4. `ui` — Ratatui Rendering
 
-**Layout:** Two-column split. Left column is fixed-width sidebar (15 chars). Right column is the main panel, rendered by the active panel's function.
+**Layout:** Two-column split. Left column is fixed-width sidebar (17 chars). Right column is the main panel, rendered by the active panel's function.
 
 **Sidebar:** List of panel names. Active panel highlighted. `j/k` or `↑/↓` to navigate, `Enter` or `l/→` to focus main panel.
 
@@ -223,7 +228,7 @@ Tick timer (1s) updates playback progress bar between poll events. Poll events w
 
 **Event subscriptions:** Register for `player:volume`, `player:player/data`, `settings:/kef/play/physicalSource`, `settings:/kef/host/speakerStatus`, `settings:/mediaPlayer/mute`, `settings:/kef/host/cableMode`.
 
-**Shutdown:** On quit, drop the connection. The speaker cleans up stale event subscriptions automatically.
+**Shutdown:** On quit, `CancellationToken` cancels all spawned tasks (speaker poll loop, SIGUSR1 listener), then the terminal is restored. The speaker cleans up stale event subscriptions automatically.
 
 ### 6. `config` — Configuration
 
@@ -283,16 +288,21 @@ Tick Timer    ──→ increment playback position ──→ re-render progress
 
 ```toml
 [dependencies]
-ratatui = "0.29"
-crossterm = "0.28"
-reqwest = { version = "0.12", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+futures = "0.3"
+reqwest = { version = "0.13", features = ["json", "query"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "signal", "macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-mdns-sd = "0.11"
-toml = "0.8"
+mdns-sd = "0.17"
+toml = "0.9"
 clap = { version = "4", features = ["derive"] }
 dirs = "6"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tokio-util = { version = "0.7", features = ["rt"] }
 ```
 
 ## CLI Interface

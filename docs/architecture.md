@@ -56,10 +56,12 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 │         ┌────────────────┐     ┌──────────────┐     │
 │         │  App::handle   │────►│  dispatch     │     │
 │         │  (optimistic   │     │  (async HTTP  │     │
-│         │   UI update)   │     │   fire&forget)│     │
+│         │   UI update)   │     │   w/ error tx)│     │
 │         └────────────────┘     └──────────────┘     │
 └──────────────────────────────────────────────────────┘
 ```
+
+`dispatch_action` spawns async HTTP requests via `tokio::spawn`. On failure, errors are sent back through the event channel as `Event::SpeakerError`, surfacing as TUI notifications. Graceful shutdown uses `CancellationToken` from `tokio-util` to cancel all spawned tasks (speaker poll loop, SIGUSR1 listener).
 
 ## Module Map
 
@@ -71,21 +73,22 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | `app.rs` | All application state: `App`, `SpeakerState`, `Panel`, `Focus`, `Action` enum, keyboard handling |
 | `event.rs` | Async event multiplexer: terminal input, tick timer, speaker polling, SIGUSR1 |
 | `tui.rs` | Terminal setup/teardown (alternate screen, raw mode) |
+| `cli.rs` | CLI argument parsing (clap derive) |
 | `config.rs` | TOML config file loader |
 | `discovery.rs` | mDNS speaker discovery via `_kef-info._tcp.local.` |
-| `error.rs` | `KefError` enum (network, API, discovery, timeout) |
+| `error.rs` | `KefError` enum (network, API, type mismatch, discovery, config) |
 
 ### KEF API Client (`kef_api/`)
 
 | Module | Responsibility |
 |--------|---------------|
-| `mod.rs` | `KefClient` struct, `get_data`/`set_data` core methods, `fetch_full_state` |
+| `mod.rs` | `KefClient` struct, `get_data`/`set_data` core methods, `fetch_full_state`, `extract_string`/`extract_i32`/`extract_bool` pure functions |
 | `types.rs` | `ApiValue` tagged union serde, `Source`, `StandbyMode`, `CableMode`, `EqProfile` |
 | `volume.rs` | `get_volume`, `set_volume`, `get_max_volume`, `get_mute`, `set_mute` |
 | `source.rs` | `get_source`, `set_source` |
 | `playback.rs` | `play`, `pause`, `next_track`, `previous_track`, `seek` |
 | `settings.rs` | `get/set_standby_mode`, `get/set_cable_mode`, LED, startup tone |
-| `eq.rs` | Raw EQ data fetch |
+| `paths.rs` | API path string constants |
 | `events.rs` | `subscribe`, `poll_events` (long-poll), `unsubscribe` |
 
 ### UI (`ui/`)
@@ -93,7 +96,7 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | Module | Responsibility |
 |--------|---------------|
 | `mod.rs` | Top-level layout (sidebar + main), footer bar, notification overlay |
-| `theme.rs` | `Theme` struct (14 color fields), Omarchy loader, `block()` helper |
+| `theme.rs` | `Theme` struct (13 color fields), Omarchy loader, `block()` / `info_row()` / `section_block()` helpers |
 | `sidebar.rs` | Panel navigation list with focus highlighting |
 | `status.rs` | Speaker info, settings summary, now playing + progress bar |
 | `source.rs` | Input source selector with active marker |
@@ -120,12 +123,12 @@ This maps to `ApiValue` enum with `#[serde(tag = "type")]` and per-variant renam
 
 When the user presses a key (e.g., volume up), the app:
 1. Updates `SpeakerState` immediately (instant UI feedback)
-2. Fires an async HTTP request via `dispatch_action` (tokio::spawn, fire-and-forget)
+2. Fires an async HTTP request via `dispatch_action` (tokio::spawn, errors sent back via event channel)
 3. Speaker poll loop will eventually confirm or revert the state
 
 ### Theme system
 
-All colors flow through `app.theme`. The `Theme::block(title, focused)` helper eliminates duplicated border construction across panels. SIGUSR1 triggers `Theme::load()` which re-reads Omarchy colors.
+All colors flow through `app.theme`. The `Theme::block(title, focused)` helper eliminates duplicated border construction across panels. `info_row()` and `section_block()` provide consistent styling for labeled key-value rows and sub-sections. SIGUSR1 triggers `Theme::load()` which re-reads Omarchy colors.
 
 ### Speaker event polling
 
@@ -140,7 +143,9 @@ All colors flow through `app.theme`. The `Theme::block(title, focused)` helper e
 | Crate | Purpose |
 |-------|---------|
 | `ratatui` + `crossterm` | Terminal UI framework |
-| `tokio` | Async runtime |
+| `tokio` | Async runtime (scoped features, not `"full"`) |
+| `tokio-util` | `CancellationToken` for graceful shutdown |
+| `futures` | Stream combinators for async event processing |
 | `reqwest` | HTTP client for KEF API |
 | `serde` + `serde_json` | JSON serialization (ApiValue tagged union) |
 | `toml` | Config file + Omarchy theme parsing |
