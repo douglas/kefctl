@@ -42,23 +42,23 @@ async fn main() {
     match cli.command {
         Some(Commands::Discover) => cmd_discover().await,
         Some(Commands::Status) => {
-            let ip = parse_speaker_ip(require_speaker(speaker_ip));
+            let ip = resolve_speaker(speaker_ip);
             cmd_status(ip).await;
         }
         Some(Commands::Source { source: Some(s) }) => {
-            let ip = parse_speaker_ip(require_speaker(speaker_ip));
+            let ip = resolve_speaker(speaker_ip);
             cmd_set_source(ip, s).await;
         }
         Some(Commands::Source { source: None }) => {
-            let ip = parse_speaker_ip(require_speaker(speaker_ip));
+            let ip = resolve_speaker(speaker_ip);
             cmd_get_source(ip).await;
         }
         Some(Commands::Volume { level: Some(v) }) => {
-            let ip = parse_speaker_ip(require_speaker(speaker_ip));
+            let ip = resolve_speaker(speaker_ip);
             cmd_set_volume(ip, v).await;
         }
         Some(Commands::Volume { level: None }) => {
-            let ip = parse_speaker_ip(require_speaker(speaker_ip));
+            let ip = resolve_speaker(speaker_ip);
             cmd_get_volume(ip).await;
         }
         None => {
@@ -79,12 +79,14 @@ async fn run_tui_demo(config: Config) {
 }
 
 async fn run_tui_live(ip_str: Option<String>, config: Config) {
-    // Resolve speaker IP: flag/config > mDNS discovery
+    // Resolve speaker IP: flag/config > cached IP > mDNS discovery
     let ip: IpAddr = if let Some(ref s) = ip_str {
         s.parse().unwrap_or_else(|_| {
             eprintln!("Invalid IP address: {s}");
             std::process::exit(1);
         })
+    } else if let Some(cached) = try_cached_ip().await {
+        cached
     } else {
         eprintln!("Discovering speakers...");
         match discovery::discover_speakers(Duration::from_secs(5)).await {
@@ -121,6 +123,9 @@ async fn run_tui_live(ip_str: Option<String>, config: Config) {
             std::process::exit(1);
         }
     };
+
+    // Cache the working IP for next launch
+    config::save_cached_ip(&ip);
 
     let app = App::new_live(state);
     let tick_rate = Duration::from_millis(config.ui.refresh_ms);
@@ -186,6 +191,20 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
     events.shutdown();
     if let Err(e) = tui::restore() {
         eprintln!("Failed to restore terminal: {e}");
+    }
+}
+
+/// Try the cached speaker IP — quick probe to see if the speaker is still there.
+async fn try_cached_ip() -> Option<IpAddr> {
+    let cached = config::load_cached_ip()?;
+    let ip: IpAddr = cached.parse().ok()?;
+    eprintln!("Trying cached speaker {ip}...");
+    let client = KefClient::new(ip);
+    if client.fetch_full_state().await.is_ok() {
+        Some(ip)
+    } else {
+        tracing::debug!("Cached speaker {ip} unreachable, falling back to discovery");
+        None
     }
 }
 
@@ -274,15 +293,19 @@ async fn cmd_discover() {
     }
 }
 
-fn require_speaker(ip: Option<&str>) -> &str {
-    ip.unwrap_or_else(|| {
-        eprintln!(
-            "No speaker specified. Use --speaker <ip>, \
-             set ip in ~/.config/kefctl/config.toml, \
-             or run 'kefctl discover' to find speakers."
-        );
-        std::process::exit(1);
-    })
+fn require_speaker(ip: Option<&str>) -> String {
+    if let Some(s) = ip {
+        return s.to_string();
+    }
+    if let Some(cached) = config::load_cached_ip() {
+        return cached;
+    }
+    eprintln!(
+        "No speaker specified. Use --speaker <ip>, \
+         set ip in ~/.config/kefctl/config.toml, \
+         or run 'kefctl discover' to find speakers."
+    );
+    std::process::exit(1);
 }
 
 fn parse_speaker_ip(ip_str: &str) -> IpAddr {
@@ -290,6 +313,11 @@ fn parse_speaker_ip(ip_str: &str) -> IpAddr {
         eprintln!("Invalid IP address: {ip_str}");
         std::process::exit(1);
     })
+}
+
+fn resolve_speaker(ip: Option<&str>) -> IpAddr {
+    let s = require_speaker(ip);
+    parse_speaker_ip(&s)
 }
 
 async fn cmd_status(ip: IpAddr) {

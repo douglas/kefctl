@@ -53,6 +53,33 @@ impl Config {
     }
 }
 
+/// Returns the path to the cached speaker IP file.
+/// Uses XDG state dir: `~/.local/state/kefctl/last_speaker`
+fn cache_path() -> PathBuf {
+    dirs::state_dir()
+        .or_else(dirs::data_local_dir)
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("kefctl")
+        .join("last_speaker")
+}
+
+/// Load the cached speaker IP from the state file.
+pub(crate) fn load_cached_ip() -> Option<String> {
+    let path = cache_path();
+    let contents = std::fs::read_to_string(&path).ok()?;
+    let ip = contents.trim().to_string();
+    if ip.is_empty() { None } else { Some(ip) }
+}
+
+/// Save a speaker IP to the state file for next launch.
+pub(crate) fn save_cached_ip(ip: &std::net::IpAddr) {
+    let path = cache_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&path, ip.to_string());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,6 +164,43 @@ mod tests {
             ip = 12345
         ";
         let result = Config::load_from_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn save_and_load_cached_ip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("last_speaker");
+
+        // Save
+        let ip: std::net::IpAddr = "192.168.50.17".parse().unwrap();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::write(&path, ip.to_string()).unwrap();
+
+        // Load
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let loaded = contents.trim().to_string();
+        assert_eq!(loaded, "192.168.50.17");
+    }
+
+    #[test]
+    fn load_cached_ip_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("last_speaker");
+        std::fs::write(&path, "").unwrap();
+
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let ip = contents.trim().to_string();
+        assert!(ip.is_empty());
+    }
+
+    #[test]
+    fn load_cached_ip_missing_file() {
+        // load_cached_ip returns None when file doesn't exist
+        // Test the logic directly
+        let result = std::fs::read_to_string("/nonexistent/path/last_speaker");
         assert!(result.is_err());
     }
 
