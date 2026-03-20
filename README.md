@@ -213,6 +213,10 @@ Values use a tagged union format: `{"type": "i32_", "i32_": 50}`.
 
 Logs are written to `~/.local/state/kefctl/kefctl.log` (no terminal output to keep TUI clean).
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License
 
 MIT
