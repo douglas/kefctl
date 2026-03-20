@@ -121,7 +121,10 @@ The speaker IP is resolved in this order:
 
 1. `--speaker <ip>` flag
 2. `speaker.ip` in config file
-3. mDNS discovery (`_kef-info._tcp.local.`) — uses first KEF speaker found
+3. Cached IP from last successful connection (`~/.local/state/kefctl/last_speaker`)
+4. mDNS discovery (`_kef-info._tcp.local.`) — uses first KEF speaker found
+
+After a successful connection, the speaker IP is cached so subsequent launches skip the 5-second mDNS discovery.
 
 ## Themes
 

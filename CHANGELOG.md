@@ -14,6 +14,7 @@ All notable changes to kefctl will be documented in this file.
 
 ### Added
 
+- Cached speaker IP: after a successful connection, the speaker IP is saved to `~/.local/state/kefctl/last_speaker` and tried first on next launch, skipping 5-second mDNS discovery
 - GitHub Actions CI: clippy (`-D warnings`), test, and release build
 - `[profile.release]` with LTO, strip, `codegen-units = 1`
 - Graceful async shutdown via `CancellationToken` (`tokio-util`)

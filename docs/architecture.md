@@ -21,7 +21,7 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 ### Startup sequence
 
 1. Parse CLI args (clap) and load `~/.config/kefctl/config.toml`
-2. Resolve speaker IP: `--speaker` flag → config file → mDNS discovery
+2. Resolve speaker IP: `--speaker` flag → config file → cached IP → mDNS discovery
 3. `KefClient::fetch_full_state()` — parallel HTTP GETs for all settings
 4. Initialize `App` with `SpeakerState` + `Theme::load()`
 5. Enter TUI event loop

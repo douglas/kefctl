@@ -462,7 +462,10 @@ The speaker IP is resolved in order (first match wins):
 
 1. `--speaker <ip>` CLI flag
 2. `speaker.ip` in `~/.config/kefctl/config.toml`
-3. mDNS discovery (`_kef-info._tcp.local.`) — uses first speaker found
+3. Cached IP from last successful connection (`~/.local/state/kefctl/last_speaker`) — quick probe, falls back if unreachable
+4. mDNS discovery (`_kef-info._tcp.local.`) — uses first speaker found
+
+After a successful connection, the IP is saved to the cache file so subsequent launches skip the 5-second mDNS discovery.
 
 ### Visibility: `pub(crate)`
 
