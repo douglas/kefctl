@@ -4,6 +4,7 @@ use std::time::Duration;
 use crossterm::event::{Event as CrosstermEvent, EventStream, KeyEvent};
 use futures::StreamExt;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use crate::app::SpeakerState;
 use crate::kef_api::KefClient;
@@ -21,20 +22,25 @@ pub enum Event {
 
 pub struct EventHandler {
     rx: mpsc::UnboundedReceiver<Event>,
+    tx: mpsc::UnboundedSender<Event>,
+    cancel: CancellationToken,
 }
 
 impl EventHandler {
     pub fn new(tick_rate: Duration, client: Option<Arc<KefClient>>) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
+        let cancel = CancellationToken::new();
 
         // Terminal event + tick task
         let tx_term = tx.clone();
+        let token = cancel.clone();
         tokio::spawn(async move {
             let mut reader = EventStream::new();
             let mut tick_interval = tokio::time::interval(tick_rate);
 
             loop {
                 tokio::select! {
+                    () = token.cancelled() => break,
                     _ = tick_interval.tick() => {
                         if tx_term.send(Event::Tick).is_err() {
                             break;
@@ -63,38 +69,56 @@ impl EventHandler {
         // Speaker poll task (only if we have a client)
         if let Some(client) = client {
             let tx_speaker = tx.clone();
+            let token = cancel.clone();
             tokio::spawn(async move {
-                speaker_poll_loop(client, tx_speaker).await;
+                speaker_poll_loop(client, tx_speaker, token).await;
             });
         }
 
         // SIGUSR1 theme reload listener
         #[cfg(unix)]
         {
-            let tx_signal = tx;
+            let tx_signal = tx.clone();
+            let token = cancel.clone();
             tokio::spawn(async move {
                 use tokio::signal::unix::{SignalKind, signal};
                 let Ok(mut stream) = signal(SignalKind::user_defined1()) else {
                     return;
                 };
                 loop {
-                    stream.recv().await;
-                    if tx_signal.send(Event::ThemeChanged).is_err() {
-                        break;
+                    tokio::select! {
+                        () = token.cancelled() => break,
+                        _ = stream.recv() => {
+                            if tx_signal.send(Event::ThemeChanged).is_err() {
+                                break;
+                            }
+                        }
                     }
                 }
             });
         }
 
-        Self { rx }
+        Self { rx, tx, cancel }
     }
 
     pub async fn next(&mut self) -> Option<Event> {
         self.rx.recv().await
     }
+
+    pub fn sender(&self) -> mpsc::UnboundedSender<Event> {
+        self.tx.clone()
+    }
+
+    pub fn shutdown(&self) {
+        self.cancel.cancel();
+    }
 }
 
-async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Event>) {
+async fn speaker_poll_loop(
+    client: Arc<KefClient>,
+    tx: mpsc::UnboundedSender<Event>,
+    cancel: CancellationToken,
+) {
     // Subscribe to key state changes
     let paths = &[
         api::VOLUME,
@@ -106,17 +130,28 @@ async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Eve
     ];
 
     loop {
+        if cancel.is_cancelled() {
+            return;
+        }
+
         let queue_id = match client.subscribe(paths).await {
             Ok(id) => id,
             Err(e) => {
                 let _ = tx.send(Event::SpeakerError(format!("Subscribe failed: {e}")));
-                tokio::time::sleep(Duration::from_secs(5)).await;
-                continue;
+                tokio::select! {
+                    () = cancel.cancelled() => return,
+                    () = tokio::time::sleep(Duration::from_secs(5)) => continue,
+                }
             }
         };
 
         // Poll loop
         loop {
+            if cancel.is_cancelled() {
+                let _ = client.unsubscribe(&queue_id).await;
+                return;
+            }
+
             match client.poll_events(&queue_id).await {
                 Ok(Some(_)) => {
                     // On any event, re-fetch full state for simplicity
@@ -143,6 +178,9 @@ async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Eve
 
         // Unsubscribe (best effort) and retry after delay
         let _ = client.unsubscribe(&queue_id).await;
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::select! {
+            () = cancel.cancelled() => return,
+            () = tokio::time::sleep(Duration::from_secs(5)) => {},
+        }
     }
 }

@@ -136,6 +136,7 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
     }));
 
     let mut events = EventHandler::new(tick_rate, client.clone());
+    let event_tx = events.sender();
 
     loop {
         terminal
@@ -149,7 +150,7 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
                     break;
                 }
                 if let (Some(action), Some(client)) = (action, client.as_ref()) {
-                    dispatch_action(client.clone(), action);
+                    dispatch_action(client.clone(), action, event_tx.clone());
                 }
             }
             Some(Event::Tick) => {
@@ -171,10 +172,15 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
         }
     }
 
+    events.shutdown();
     tui::restore().expect("failed to restore terminal");
 }
 
-fn dispatch_action(client: Arc<KefClient>, action: Action) {
+fn dispatch_action(
+    client: Arc<KefClient>,
+    action: Action,
+    tx: tokio::sync::mpsc::UnboundedSender<Event>,
+) {
     tokio::spawn(async move {
         let result = match action {
             Action::SetVolume(v) => client.set_volume(v).await,
@@ -201,6 +207,7 @@ fn dispatch_action(client: Arc<KefClient>, action: Action) {
         };
         if let Err(e) = result {
             tracing::warn!("API action failed: {e}");
+            let _ = tx.send(Event::SpeakerError(format!("Action failed: {e}")));
         }
     });
 }
