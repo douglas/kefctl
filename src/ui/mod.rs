@@ -1,4 +1,5 @@
 mod eq;
+mod help;
 mod network;
 mod sidebar;
 mod settings;
@@ -41,6 +42,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             height: 1,
         };
         frame.render_widget(status, status_area);
+    }
+
+    // Help overlay (on top of everything)
+    if app.show_help {
+        help::draw(frame);
     }
 
     // Notification overlay

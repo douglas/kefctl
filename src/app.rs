@@ -181,6 +181,7 @@ pub struct App {
     pub network_speakers: Vec<DiscoveredSpeaker>,
     pub notification: Option<String>,
     pub notification_ttl: u8,
+    pub show_help: bool,
     pub should_quit: bool,
     pub demo: bool,
 }
@@ -204,6 +205,7 @@ impl App {
             network_speakers: vec![],
             notification: None,
             notification_ttl: 0,
+            show_help: false,
             should_quit: false,
             demo: false,
         }
@@ -227,6 +229,7 @@ impl App {
             network_speakers: vec![],
             notification: None,
             notification_ttl: 0,
+            show_help: false,
             should_quit: false,
             demo: true,
         }
@@ -275,8 +278,23 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Option<Action> {
+        // Help overlay intercepts all keys
+        if self.show_help {
+            match key.code {
+                KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => {
+                    self.show_help = false;
+                }
+                _ => {}
+            }
+            return None;
+        }
+
         // Global keys
         match key.code {
+            KeyCode::Char('?') => {
+                self.show_help = true;
+                return None;
+            }
             KeyCode::Char('q') => {
                 self.should_quit = true;
                 return None;
