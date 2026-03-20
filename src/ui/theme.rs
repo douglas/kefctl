@@ -20,7 +20,6 @@ pub struct Theme {
     pub progress_filled: Color,
     pub progress_empty: Color,
     pub badge_bg: Color,
-    pub badge_fg: Color,
 }
 
 impl Default for Theme {
@@ -39,7 +38,6 @@ impl Default for Theme {
             progress_filled: Color::Cyan,
             progress_empty: Color::DarkGray,
             badge_bg: Color::DarkGray,
-            badge_fg: Color::Black,
         }
     }
 }
@@ -118,7 +116,6 @@ fn load_omarchy() -> Option<Theme> {
         progress_filled: accent,
         progress_empty: color8,
         badge_bg: color8,
-        badge_fg: Color::Black,
     })
 }
 

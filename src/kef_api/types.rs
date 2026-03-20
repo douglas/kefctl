@@ -168,10 +168,6 @@ impl ApiValue {
         ApiValue::I32 { value }
     }
 
-    pub fn i64(value: i64) -> Self {
-        ApiValue::I64 { value }
-    }
-
     pub fn string(value: impl Into<String>) -> Self {
         ApiValue::String {
             value: value.into(),
@@ -184,14 +180,6 @@ impl ApiValue {
 
     pub fn source(value: Source) -> Self {
         ApiValue::PhysicalSource { value }
-    }
-
-    pub fn speaker_status(value: SpeakerStatus) -> Self {
-        ApiValue::SpeakerStatus { value }
-    }
-
-    pub fn cable_mode(value: CableMode) -> Self {
-        ApiValue::CableMode { value }
     }
 }
 
@@ -218,36 +206,6 @@ impl SetDataRequest {
             value,
         }
     }
-}
-
-// ---------- Player Data ----------
-
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(default)]
-pub struct PlayerData {
-    #[serde(rename = "trackRoles")]
-    pub track_roles: Option<TrackRoles>,
-    pub state: Option<String>,
-    #[serde(rename = "mediaRoles")]
-    pub media_roles: Option<MediaRoles>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(default)]
-pub struct TrackRoles {
-    pub title: Option<String>,
-    pub artist: Option<String>,
-    pub album: Option<String>,
-    pub icon: Option<String>,
-    pub media_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(default)]
-pub struct MediaRoles {
-    pub duration: Option<f64>,
-    #[serde(rename = "playTime")]
-    pub play_time: Option<f64>,
 }
 
 // ---------- EQ ----------
@@ -338,27 +296,6 @@ impl SubPolarity {
         }
     }
 
-    pub fn toggle(self) -> Self {
-        match self {
-            SubPolarity::Positive => SubPolarity::Negative,
-            SubPolarity::Negative => SubPolarity::Positive,
-        }
-    }
-}
-
-// ---------- Event types ----------
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EventSubscribeResponse {
-    #[serde(rename = "queueId")]
-    pub queue_id: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct PollEvent {
-    pub path: String,
-    #[serde(flatten)]
-    pub value: serde_json::Value,
 }
 
 #[cfg(test)]
@@ -409,7 +346,7 @@ mod tests {
 
     #[test]
     fn api_value_cable_mode_roundtrip() {
-        let val = ApiValue::cable_mode(CableMode::Wired);
+        let val = ApiValue::CableMode { value: CableMode::Wired };
         let json = serde_json::to_string(&val).unwrap();
         assert_eq!(
             json,
@@ -425,7 +362,7 @@ mod tests {
 
     #[test]
     fn api_value_speaker_status_roundtrip() {
-        let val = ApiValue::speaker_status(SpeakerStatus::PowerOn);
+        let val = ApiValue::SpeakerStatus { value: SpeakerStatus::PowerOn };
         let json = serde_json::to_string(&val).unwrap();
         assert_eq!(
             json,

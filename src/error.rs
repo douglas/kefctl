@@ -8,9 +8,6 @@ pub enum KefError {
     #[error("API error (status {status}): {message}")]
     Api { status: u16, message: String },
 
-    #[error("request timed out")]
-    Timeout,
-
     #[error("discovery error: {0}")]
     Discovery(String),
 

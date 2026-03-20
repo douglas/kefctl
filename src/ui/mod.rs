@@ -67,7 +67,6 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
     let (conn_text, conn_color) = match app.connection {
         ConnectionState::Connected => ("●", theme.status_ok),
-        ConnectionState::Connecting => ("◌", theme.status_warn),
         ConnectionState::Disconnected if app.demo => ("◆ demo", theme.status_demo),
         ConnectionState::Disconnected => ("○ disconnected", theme.status_error),
     };

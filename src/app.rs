@@ -19,7 +19,7 @@ pub enum Action {
     PreviousTrack,
     SeekForward,
     SeekBackward,
-    SetCableMode(CableMode),
+    SetCableMode,
     SetStandbyMode(StandbyMode),
     SetMaxVolume(i32),
     SetFrontLed(bool),
@@ -64,7 +64,6 @@ impl Panel {
 pub enum ConnectionState {
     #[default]
     Disconnected,
-    Connecting,
     Connected,
 }
 
@@ -537,7 +536,7 @@ impl App {
                     CableMode::Wired => CableMode::Wireless,
                     CableMode::Wireless => CableMode::Wired,
                 };
-                Some(Action::SetCableMode(self.speaker.cable_mode))
+                Some(Action::SetCableMode)
             }
             1 => {
                 self.speaker.standby_mode = if dir > 0 {

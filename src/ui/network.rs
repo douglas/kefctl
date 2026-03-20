@@ -20,7 +20,6 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     // Connection status
     let (status_text, status_color) = match app.connection {
         ConnectionState::Connected => ("● Connected", theme.status_ok),
-        ConnectionState::Connecting => ("◌ Connecting...", theme.status_warn),
         ConnectionState::Disconnected => ("○ Disconnected", theme.status_error),
     };
     let conn_info = format!(

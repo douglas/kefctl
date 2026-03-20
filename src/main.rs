@@ -164,7 +164,7 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
             Some(Event::ThemeChanged) => {
                 app.theme = ui::theme::Theme::load();
             }
-            Some(Event::Resize(_, _)) => {}
+            Some(Event::Resize) => {}
             Some(Event::SpeakerUpdate(state)) => {
                 app.speaker = *state;
                 app.connection = app::ConnectionState::Connected;
@@ -192,7 +192,7 @@ fn dispatch_action(client: Arc<KefClient>, action: Action) {
             Action::PreviousTrack => client.previous_track().await,
             Action::SeekForward => client.seek(10).await,
             Action::SeekBackward => client.seek(-10).await,
-            Action::SetCableMode(_) => Ok(()), // Cable mode is read-only in practice
+            Action::SetCableMode => Ok(()), // Cable mode is read-only in practice
             Action::SetStandbyMode(m) => client.set_standby_mode(m).await,
             Action::SetMaxVolume(v) => {
                 client

@@ -1,4 +1,3 @@
-pub mod eq;
 pub mod events;
 pub mod playback;
 pub mod settings;

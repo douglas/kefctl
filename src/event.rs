@@ -11,7 +11,7 @@ use crate::kef_api::KefClient;
 #[derive(Debug)]
 pub enum Event {
     Key(KeyEvent),
-    Resize(u16, u16),
+    Resize,
     Tick,
     SpeakerUpdate(Box<SpeakerState>),
     SpeakerError(String),
@@ -46,8 +46,8 @@ impl EventHandler {
                                     break;
                                 }
                             }
-                            Some(Ok(CrosstermEvent::Resize(w, h))) => {
-                                if tx_term.send(Event::Resize(w, h)).is_err() {
+                            Some(Ok(CrosstermEvent::Resize(_, _))) => {
+                                if tx_term.send(Event::Resize).is_err() {
                                     break;
                                 }
                             }
