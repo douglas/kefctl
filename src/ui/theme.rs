@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use ratatui::{
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, BorderType, Borders},
 };
 
@@ -45,6 +46,23 @@ impl Default for Theme {
 impl Theme {
     pub fn load() -> Self {
         load_omarchy().unwrap_or_default()
+    }
+
+    pub fn info_row<'a>(&self, label: &'a str, value: &'a str) -> Line<'a> {
+        Line::from(vec![
+            Span::styled(
+                format!("  {label:<10}"),
+                Style::default().fg(self.fg_dim),
+            ),
+            Span::styled(value, Style::default().fg(self.fg)),
+        ])
+    }
+
+    pub fn section_block<'a>(&self, title: &'a str) -> Block<'a> {
+        Block::default()
+            .title(title)
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(self.border))
     }
 
     pub fn block<'a>(&self, title: &'a str, focused: bool) -> Block<'a> {
