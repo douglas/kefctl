@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
 
 use crate::kef_api::types::{
@@ -203,5 +204,93 @@ impl App {
             self.panel.index() - 1
         };
         self.select_panel(Panel::ALL[idx]);
+    }
+
+    pub fn tick(&mut self) {
+        if self.speaker.playing
+            && let (Some(pos), Some(dur)) = (self.speaker.position, self.speaker.duration)
+            && pos < dur
+        {
+            self.speaker.position = Some(pos + 1);
+        }
+    }
+
+    pub fn handle_key(&mut self, key: KeyEvent) {
+        // Global keys
+        match key.code {
+            KeyCode::Char('q') => {
+                self.should_quit = true;
+                return;
+            }
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.should_quit = true;
+                return;
+            }
+            KeyCode::Tab => {
+                self.next_panel();
+                return;
+            }
+            KeyCode::BackTab => {
+                self.prev_panel();
+                return;
+            }
+            // Global playback controls
+            KeyCode::Char('m') => {
+                self.speaker.muted = !self.speaker.muted;
+                return;
+            }
+            KeyCode::Char('+') | KeyCode::Char('=') => {
+                if self.speaker.volume < self.speaker.max_volume {
+                    self.speaker.volume += 1;
+                }
+                return;
+            }
+            KeyCode::Char('-') => {
+                if self.speaker.volume > 0 {
+                    self.speaker.volume -= 1;
+                }
+                return;
+            }
+            KeyCode::Char(' ') => {
+                self.speaker.playing = !self.speaker.playing;
+                return;
+            }
+            KeyCode::Char('n') if self.focus == Focus::Sidebar => {
+                // next track — Phase 8 will fire API call
+                return;
+            }
+            KeyCode::Char('p') if self.focus == Focus::Sidebar => {
+                // prev track — Phase 8 will fire API call
+                return;
+            }
+            _ => {}
+        }
+
+        match self.focus {
+            Focus::Sidebar => self.handle_key_sidebar(key),
+            Focus::Main => self.handle_key_main(key),
+        }
+    }
+
+    fn handle_key_sidebar(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => self.next_panel(),
+            KeyCode::Char('k') | KeyCode::Up => self.prev_panel(),
+            KeyCode::Char('l') | KeyCode::Right | KeyCode::Enter => {
+                self.focus = Focus::Main;
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_key_main(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('h') | KeyCode::Left | KeyCode::Esc => {
+                self.focus = Focus::Sidebar;
+            }
+            _ => {
+                // Panel-specific keys will be added in Phase 7
+            }
+        }
     }
 }

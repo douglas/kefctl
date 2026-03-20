@@ -1,15 +1,22 @@
 mod app;
 mod cli;
 mod config;
+mod discovery;
 mod error;
+mod event;
 mod kef_api;
+mod tui;
+mod ui;
 
 use std::net::IpAddr;
+use std::time::Duration;
 
 use clap::Parser;
 
+use app::App;
 use cli::{Cli, Commands};
 use config::Config;
+use event::{Event, EventHandler};
 use kef_api::KefClient;
 use kef_api::types::Source;
 
@@ -27,8 +34,8 @@ fn main() {
 
     match cli.command {
         Some(Commands::Discover) => {
-            println!("Discovering KEF speakers on the network...");
-            println!("(not yet implemented — see Phase 4)");
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(cmd_discover());
         }
         Some(Commands::Status) => {
             let ip = parse_speaker_ip(require_speaker(speaker_ip));
@@ -56,14 +63,76 @@ fn main() {
             rt.block_on(cmd_get_volume(ip));
         }
         None => {
+            let rt = tokio::runtime::Runtime::new().unwrap();
             if cli.demo {
-                println!("Launching TUI in demo mode...");
-                println!("(not yet implemented — see Phase 5)");
+                rt.block_on(run_tui(App::new_demo(), config));
             } else {
                 let _ip = speaker_ip;
-                println!("Launching TUI...");
-                println!("(not yet implemented — see Phase 5)");
+                eprintln!("TUI with live speaker not yet wired — use --demo for now");
+                std::process::exit(1);
             }
+        }
+    }
+}
+
+async fn run_tui(mut app: App, config: Config) {
+    let mut terminal = tui::init().expect("failed to init terminal");
+
+    // Install panic hook that restores terminal
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let _ = tui::restore();
+        original_hook(panic_info);
+    }));
+
+    let tick_rate = Duration::from_millis(config.ui.refresh_ms);
+    let mut events = EventHandler::new(tick_rate);
+
+    loop {
+        terminal
+            .draw(|frame| ui::draw(frame, &mut app))
+            .expect("failed to draw");
+
+        match events.next().await {
+            Some(Event::Key(key)) => {
+                app.handle_key(key);
+                if app.should_quit {
+                    break;
+                }
+            }
+            Some(Event::Tick) => {
+                app.tick();
+            }
+            Some(Event::Resize(_, _)) => {
+                // Terminal auto-redraws on next loop
+            }
+            Some(Event::SpeakerUpdate(state)) => {
+                app.speaker = *state;
+            }
+            Some(Event::SpeakerError(msg)) => {
+                app.notification = Some(msg);
+            }
+            None => break,
+        }
+    }
+
+    tui::restore().expect("failed to restore terminal");
+}
+
+async fn cmd_discover() {
+    println!("Discovering KEF speakers on the network...");
+    match discovery::discover_speakers(Duration::from_secs(5)).await {
+        Ok(speakers) if speakers.is_empty() => {
+            println!("No KEF speakers found.");
+        }
+        Ok(speakers) => {
+            for s in &speakers {
+                println!("  {} — {}:{}", s.name, s.ip, s.port);
+            }
+        }
+        Err(e) => {
+            eprintln!("Discovery error: {e}");
+            std::process::exit(1);
         }
     }
 }
