@@ -504,4 +504,68 @@ mod tests {
         let result = serde_json::from_str::<ApiValue>(json);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn eq_profile_serde_roundtrip() {
+        let eq = EqProfile {
+            name: "Custom".to_string(),
+            treble: 2.5,
+            bass_extension: BassExtension::More,
+            desk_mode: true,
+            desk_db: -3.0,
+            wall_mode: false,
+            wall_db: 0.0,
+            sub_out: true,
+            sub_gain: 1.5,
+            sub_polarity: SubPolarity::Negative,
+            sub_crossover: 120,
+            phase_correction: false,
+        };
+        let json = serde_json::to_string(&eq).unwrap();
+        let parsed: EqProfile = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.name, "Custom");
+        assert_eq!(parsed.treble, 2.5);
+        assert_eq!(parsed.bass_extension, BassExtension::More);
+        assert!(parsed.desk_mode);
+        assert_eq!(parsed.desk_db, -3.0);
+        assert!(!parsed.wall_mode);
+        assert!(parsed.sub_out);
+        assert_eq!(parsed.sub_gain, 1.5);
+        assert_eq!(parsed.sub_polarity, SubPolarity::Negative);
+        assert_eq!(parsed.sub_crossover, 120);
+        assert!(!parsed.phase_correction);
+    }
+
+    #[test]
+    fn api_value_i64_roundtrip() {
+        let val = ApiValue::I64 { value: 123_456_789 };
+        let json = serde_json::to_string(&val).unwrap();
+        assert_eq!(json, r#"{"type":"i64_","i64_":123456789}"#);
+
+        let parsed: ApiValue = serde_json::from_str(&json).unwrap();
+        match parsed {
+            ApiValue::I64 { value } => assert_eq!(value, 123_456_789),
+            _ => panic!("expected I64"),
+        }
+    }
+
+    #[test]
+    fn api_value_missing_inner_field() {
+        // type present but value field missing
+        let json = r#"{"type":"i32_"}"#;
+        let result = serde_json::from_str::<ApiValue>(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn source_all_display_names_exhaustive() {
+        let names: Vec<&str> = Source::ALL.iter().map(|s| s.display_name()).collect();
+        // All unique
+        let mut deduped = names.clone();
+        deduped.sort_unstable();
+        deduped.dedup();
+        assert_eq!(names.len(), deduped.len(), "display names should be unique");
+        assert_eq!(names.len(), 7, "should have 7 selectable sources");
+    }
 }
