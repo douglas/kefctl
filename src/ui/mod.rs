@@ -1,4 +1,8 @@
+mod eq;
+mod network;
 mod sidebar;
+mod settings;
+mod source;
 pub mod status;
 
 use ratatui::{
@@ -6,7 +10,7 @@ use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
     text::Text,
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
 };
 
 use crate::app::{App, ConnectionState, Panel};
@@ -19,14 +23,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     match app.panel {
         Panel::Status => status::draw(frame, app, chunks[1]),
-        Panel::Source => draw_placeholder(frame, chunks[1], "Source", "Source selector — Phase 7"),
-        Panel::Eq => draw_placeholder(frame, chunks[1], "EQ / DSP", "EQ controls — Phase 7"),
-        Panel::Settings => {
-            draw_placeholder(frame, chunks[1], "Settings", "Settings panel — Phase 7")
-        }
-        Panel::Network => {
-            draw_placeholder(frame, chunks[1], "Network", "Network panel — Phase 7")
-        }
+        Panel::Source => source::draw(frame, app, chunks[1]),
+        Panel::Eq => eq::draw(frame, app, chunks[1]),
+        Panel::Settings => settings::draw(frame, app, chunks[1]),
+        Panel::Network => network::draw(frame, app, chunks[1]),
     }
 
     // Connection status in bottom-right if disconnected
@@ -56,15 +56,4 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         };
         frame.render_widget(notif, notif_area);
     }
-}
-
-fn draw_placeholder(frame: &mut Frame, area: ratatui::layout::Rect, title: &str, msg: &str) {
-    let block = Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray));
-    let content = Paragraph::new(msg)
-        .style(Style::default().fg(Color::DarkGray))
-        .block(block);
-    frame.render_widget(content, area);
 }
