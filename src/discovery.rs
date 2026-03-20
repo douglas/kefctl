@@ -23,10 +23,11 @@ pub async fn discover_speakers(
             break;
         }
 
-        match tokio::time::timeout(remaining, tokio::task::spawn_blocking({
-            let receiver = receiver.clone();
-            move || receiver.recv_timeout(Duration::from_millis(500))
-        }))
+        let recv = receiver.clone();
+        match tokio::time::timeout(
+            remaining,
+            tokio::task::spawn_blocking(move || recv.recv_timeout(Duration::from_millis(500))),
+        )
         .await
         {
             Ok(Ok(Ok(ServiceEvent::ServiceResolved(info)))) => {

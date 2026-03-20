@@ -84,7 +84,7 @@ src/
 │   ├── source.rs    # Source get/set
 │   ├── playback.rs  # Play/pause/next/prev/seek
 │   ├── settings.rs  # Cable mode, standby, LED, startup tone
-│   ├── eq.rs        # EQ profile raw data
+│   ├── paths.rs     # API path constants
 │   └── events.rs    # Event subscribe/poll/unsubscribe
 └── ui/              # Ratatui rendering
     ├── mod.rs       # Layout, footer, notification overlay
