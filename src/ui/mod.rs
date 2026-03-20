@@ -132,3 +132,103 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
+
+#[cfg(test)]
+mod tests {
+    use ratatui::{Terminal, backend::TestBackend};
+
+    use crate::app::{App, Panel};
+
+    fn render_app(app: &mut App, width: u16, height: u16) -> ratatui::buffer::Buffer {
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| super::draw(frame, app)).unwrap();
+        terminal.backend().buffer().clone()
+    }
+
+    fn buffer_text(buf: &ratatui::buffer::Buffer) -> String {
+        let mut text = String::new();
+        for y in 0..buf.area.height {
+            for x in 0..buf.area.width {
+                text.push_str(buf.cell((x, y)).unwrap().symbol());
+            }
+            text.push('\n');
+        }
+        text
+    }
+
+    #[test]
+    fn status_panel_renders() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Status);
+        let buf = render_app(&mut app, 80, 24);
+        let text = buffer_text(&buf);
+        assert!(text.contains("Living Room LSX II"));
+        assert!(text.contains("Now Playing"));
+    }
+
+    #[test]
+    fn source_panel_renders() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Source);
+        let buf = render_app(&mut app, 80, 24);
+        let text = buffer_text(&buf);
+        assert!(text.contains("Wi-Fi"));
+        assert!(text.contains("Bluetooth"));
+    }
+
+    #[test]
+    fn eq_panel_renders() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Eq);
+        let buf = render_app(&mut app, 80, 24);
+        let text = buffer_text(&buf);
+        assert!(text.contains("Treble"));
+        assert!(text.contains("Bass Extension"));
+    }
+
+    #[test]
+    fn settings_panel_renders() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Settings);
+        let buf = render_app(&mut app, 80, 24);
+        let text = buffer_text(&buf);
+        assert!(text.contains("Cable Mode"));
+        assert!(text.contains("Standby"));
+    }
+
+    #[test]
+    fn network_panel_renders() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Network);
+        let buf = render_app(&mut app, 80, 24);
+        let text = buffer_text(&buf);
+        assert!(text.contains("Connected") || text.contains("Disconnected"));
+    }
+
+    #[test]
+    fn help_overlay_renders() {
+        let mut app = App::new_demo();
+        app.show_help = true;
+        let buf = render_app(&mut app, 80, 30);
+        let text = buffer_text(&buf);
+        assert!(text.contains("Keybindings"));
+    }
+
+    #[test]
+    fn footer_renders_demo_badge() {
+        let mut app = App::new_demo();
+        // Demo badge shows when disconnected in demo mode
+        app.connection = crate::app::ConnectionState::Disconnected;
+        let buf = render_app(&mut app, 80, 24);
+        let text = buffer_text(&buf);
+        assert!(text.contains("demo"));
+    }
+
+    #[test]
+    fn small_terminal_no_panic() {
+        let mut app = App::new_demo();
+        // Should not panic at small size
+        let _buf = render_app(&mut app, 40, 12);
+    }
+}
