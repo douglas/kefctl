@@ -752,11 +752,11 @@ mod tests {
         a.eq_focus = 1; // treble row
         a.speaker.eq_profile.treble = 5.0;
         a.eq_adjust(1);
-        assert_eq!(a.speaker.eq_profile.treble, 5.0); // clamped at max
+        assert!((a.speaker.eq_profile.treble - 5.0).abs() < f64::EPSILON);
 
         a.speaker.eq_profile.treble = -5.0;
         a.eq_adjust(-1);
-        assert_eq!(a.speaker.eq_profile.treble, -5.0); // clamped at min
+        assert!((a.speaker.eq_profile.treble - -5.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -818,5 +818,204 @@ mod tests {
         assert!(!a.speaker.front_led);
         a.settings_cycle(1);
         assert!(a.speaker.front_led);
+    }
+
+    // -- Quit --
+
+    #[test]
+    fn quit_on_q() {
+        let mut a = app();
+        a.handle_key(key(KeyCode::Char('q')));
+        assert!(a.should_quit);
+    }
+
+    #[test]
+    fn quit_on_ctrl_c() {
+        let mut a = app();
+        let ctrl_c = KeyEvent {
+            code: KeyCode::Char('c'),
+            modifiers: KeyModifiers::CONTROL,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        };
+        a.handle_key(ctrl_c);
+        assert!(a.should_quit);
+    }
+
+    // -- Seek / Track --
+
+    #[test]
+    fn seek_forward_returns_action() {
+        let mut a = app();
+        let action = a.handle_key(key(KeyCode::Char('f')));
+        assert!(matches!(action, Some(Action::SeekForward)));
+    }
+
+    #[test]
+    fn seek_backward_from_sidebar() {
+        let mut a = app();
+        assert_eq!(a.focus, Focus::Sidebar);
+        let action = a.handle_key(key(KeyCode::Char('b')));
+        assert!(matches!(action, Some(Action::SeekBackward)));
+    }
+
+    #[test]
+    fn next_track_from_sidebar() {
+        let mut a = app();
+        assert_eq!(a.focus, Focus::Sidebar);
+        let action = a.handle_key(key(KeyCode::Char('n')));
+        assert!(matches!(action, Some(Action::NextTrack)));
+    }
+
+    #[test]
+    fn prev_track_from_sidebar() {
+        let mut a = app();
+        assert_eq!(a.focus, Focus::Sidebar);
+        let action = a.handle_key(key(KeyCode::Char('p')));
+        assert!(matches!(action, Some(Action::PreviousTrack)));
+    }
+
+    // -- Source panel --
+
+    #[test]
+    fn source_panel_j_k_navigation() {
+        let mut a = app();
+        a.select_panel(Panel::Source);
+        a.focus = Focus::Main;
+        assert_eq!(a.source_list_state.selected(), Some(0));
+
+        a.handle_key(key(KeyCode::Char('j')));
+        assert_eq!(a.source_list_state.selected(), Some(1));
+
+        a.handle_key(key(KeyCode::Char('k')));
+        assert_eq!(a.source_list_state.selected(), Some(0));
+
+        // Wrap around backward
+        a.handle_key(key(KeyCode::Char('k')));
+        assert_eq!(
+            a.source_list_state.selected(),
+            Some(Source::ALL.len() - 1)
+        );
+    }
+
+    #[test]
+    fn source_panel_enter_selects() {
+        let mut a = app();
+        a.select_panel(Panel::Source);
+        a.focus = Focus::Main;
+        a.source_list_state.select(Some(1)); // Bluetooth
+
+        let action = a.handle_key(key(KeyCode::Enter));
+        assert!(matches!(action, Some(Action::SetSource(_))));
+        assert_eq!(a.speaker.source, Source::ALL[1]);
+    }
+
+    #[test]
+    fn source_panel_h_returns_sidebar() {
+        let mut a = app();
+        a.select_panel(Panel::Source);
+        a.focus = Focus::Main;
+        a.handle_key(key(KeyCode::Char('h')));
+        assert_eq!(a.focus, Focus::Sidebar);
+    }
+
+    // -- EQ bounds --
+
+    #[test]
+    fn eq_focus_bounds() {
+        let mut a = app();
+        a.focus = Focus::Main;
+        a.select_panel(Panel::Eq);
+
+        // At 0, k shouldn't go below 0
+        a.eq_focus = 0;
+        a.handle_key(key(KeyCode::Char('k')));
+        assert_eq!(a.eq_focus, 0);
+
+        // At max (6), j shouldn't go above 6
+        a.eq_focus = 6;
+        a.handle_key(key(KeyCode::Char('j')));
+        assert_eq!(a.eq_focus, 6);
+    }
+
+    // -- Settings bounds --
+
+    #[test]
+    fn settings_focus_bounds() {
+        let mut a = app();
+        a.focus = Focus::Main;
+        a.select_panel(Panel::Settings);
+
+        a.settings_focus = 0;
+        a.handle_key(key(KeyCode::Char('k')));
+        assert_eq!(a.settings_focus, 0);
+
+        a.settings_focus = 4;
+        a.handle_key(key(KeyCode::Char('j')));
+        assert_eq!(a.settings_focus, 4);
+    }
+
+    // -- Wall mode --
+
+    #[test]
+    fn wall_mode_toggle_sequence() {
+        let mut a = app();
+        a.eq_focus = 4; // wall mode row
+        a.speaker.eq_profile.wall_mode = false;
+
+        a.eq_adjust(1); // off -> on
+        assert!(a.speaker.eq_profile.wall_mode);
+
+        a.eq_adjust(1); // adjust dB up
+        assert!(a.speaker.eq_profile.wall_mode);
+
+        // Drive dB down to minimum to turn off
+        a.speaker.eq_profile.wall_db = -5.5;
+        a.eq_adjust(-1); // -5.5 -> -6.0, turns off
+        assert!(!a.speaker.eq_profile.wall_mode);
+    }
+
+    // -- EQ bass extension / sub / phase --
+
+    #[test]
+    fn eq_bass_extension_cycles() {
+        let mut a = app();
+        a.eq_focus = 2; // bass extension row
+        a.speaker.eq_profile.bass_extension = BassExtension::Standard;
+
+        a.eq_adjust(1);
+        assert_eq!(a.speaker.eq_profile.bass_extension, BassExtension::More);
+
+        a.eq_adjust(-1);
+        assert_eq!(
+            a.speaker.eq_profile.bass_extension,
+            BassExtension::Standard
+        );
+    }
+
+    #[test]
+    fn eq_sub_out_toggles() {
+        let mut a = app();
+        a.eq_focus = 5; // sub out row
+        assert!(!a.speaker.eq_profile.sub_out);
+
+        a.eq_adjust(1);
+        assert!(a.speaker.eq_profile.sub_out);
+
+        a.eq_adjust(1);
+        assert!(!a.speaker.eq_profile.sub_out);
+    }
+
+    #[test]
+    fn eq_phase_correction_toggles() {
+        let mut a = app();
+        a.eq_focus = 6; // phase correction row
+        assert!(a.speaker.eq_profile.phase_correction);
+
+        a.eq_adjust(1);
+        assert!(!a.speaker.eq_profile.phase_correction);
+
+        a.eq_adjust(1);
+        assert!(a.speaker.eq_profile.phase_correction);
     }
 }
