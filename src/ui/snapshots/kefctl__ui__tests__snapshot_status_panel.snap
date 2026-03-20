@@ -1,0 +1,28 @@
+---
+source: src/ui/mod.rs
+expression: buffer_text(&buf)
+---
+┏ kefctl ━━━━━━━┓┌ Speaker Info ───────────────────────────────────────────────┐
+┃▸   Status     ┃│  Name      Living Room LSX II                               │
+┃    Source     ┃│  Model     LSX II                                           │
+┃    EQ / DSP   ┃│  Firmware  4.3.1.0240                                       │
+┃    Settings   ┃│  IP        192.168.50.17                                    │
+┃    Network    ┃│  MAC       AA:BB:CC:DD:EE:FF                                │
+┃               ┃│                                                             │
+┃               ┃└─────────────────────────────────────────────────────────────┘
+┃               ┃┌ Settings ───────────────────────────────────────────────────┐
+┃               ┃│  Source    Wi-Fi                                            │
+┃               ┃│  Volume    ████████░░░░░░░░░░░░ 35                          │
+┃               ┃│  Cable     Wireless                                         │
+┃               ┃│  Standby   60 minutes                                       │
+┃               ┃│  LED       on   Startup tone: on                            │
+┃               ┃└─────────────────────────────────────────────────────────────┘
+┃               ┃┌ Now Playing ────────────────────────────────────────────────┐
+┃               ┃│                                                             │
+┃               ┃│  ▶  Says                                                    │
+┃               ┃│     Nils Frahm                                              │
+┃               ┃│                                                             │
+┃               ┃│ 2:07 / 9:42 ────────────────────────────────────────────────│
+┃               ┃│ Space play/pause │ n/p next/prev │ f/b seek │ +/- volume    │
+┗━━━━━━━━━━━━━━━┛└─────────────────────────────────────────────────────────────┘
+ ?  Help │  Space  play/pause │  +/-  vol │  m  mute● Living Room LSX II │ Statu

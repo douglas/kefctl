@@ -233,4 +233,54 @@ mod tests {
         // Should not panic at small size
         let _buf = render_app(&mut app, 40, 12);
     }
+
+    // -- insta snapshot tests --
+
+    #[test]
+    fn snapshot_status_panel() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Status);
+        let buf = render_app(&mut app, 80, 24);
+        insta::assert_snapshot!(buffer_text(&buf));
+    }
+
+    #[test]
+    fn snapshot_source_panel() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Source);
+        let buf = render_app(&mut app, 80, 24);
+        insta::assert_snapshot!(buffer_text(&buf));
+    }
+
+    #[test]
+    fn snapshot_eq_panel() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Eq);
+        let buf = render_app(&mut app, 80, 24);
+        insta::assert_snapshot!(buffer_text(&buf));
+    }
+
+    #[test]
+    fn snapshot_settings_panel() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Settings);
+        let buf = render_app(&mut app, 80, 24);
+        insta::assert_snapshot!(buffer_text(&buf));
+    }
+
+    #[test]
+    fn snapshot_network_panel() {
+        let mut app = App::new_demo();
+        app.select_panel(Panel::Network);
+        let buf = render_app(&mut app, 80, 24);
+        insta::assert_snapshot!(buffer_text(&buf));
+    }
+
+    #[test]
+    fn snapshot_help_overlay() {
+        let mut app = App::new_demo();
+        app.show_help = true;
+        let buf = render_app(&mut app, 80, 30);
+        insta::assert_snapshot!(buffer_text(&buf));
+    }
 }

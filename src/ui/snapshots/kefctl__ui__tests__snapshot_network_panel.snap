@@ -1,0 +1,28 @@
+---
+source: src/ui/mod.rs
+expression: buffer_text(&buf)
+---
+┏ kefctl ━━━━━━━┓┌ Network ────────────────────────────────────────────────────┐
+┃    Status     ┃│  Status: ● Connected                                        │
+┃    Source     ┃│  IP: 192.168.50.17                                          │
+┃    EQ / DSP   ┃│  Name: Living Room LSX II                                   │
+┃    Settings   ┃│  No speakers discovered. Press 'd' to scan.                 │
+┃▸   Network    ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┗━━━━━━━━━━━━━━━┛└─────────────────────────────────────────────────────────────┘
+ ?  Help │  Space  play/pause │  +/-  vol │  m  mute● Living Room LSX II │ Netwo

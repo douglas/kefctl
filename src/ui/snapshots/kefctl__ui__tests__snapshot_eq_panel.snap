@@ -1,0 +1,28 @@
+---
+source: src/ui/mod.rs
+expression: buffer_text(&buf)
+---
+┏ kefctl ━━━━━━━┓┌ EQ / DSP ───────────────────────────────────────────────────┐
+┃    Status     ┃│▸ Profile            Standard                                │
+┃    Source     ┃│  Treble             +0.0 dB                                 │
+┃▸   EQ / DSP   ┃│  Bass Extension     Standard                                │
+┃    Settings   ┃│  Desk Mode          ON  -3.0 dB                             │
+┃    Network    ┃│  Wall Mode          OFF                                     │
+┃               ┃│  Sub Out            OFF                                     │
+┃               ┃│  Phase Correction   ON                                      │
+┃               ┃│  ◂/▸ adjust   Enter confirm   Esc back                      │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┗━━━━━━━━━━━━━━━┛└─────────────────────────────────────────────────────────────┘
+ ?  Help │  Space  play/pause │  +/-  vol │  m  mute● Living Room LSX II │ EQ /

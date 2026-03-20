@@ -1,0 +1,28 @@
+---
+source: src/ui/mod.rs
+expression: buffer_text(&buf)
+---
+┏ kefctl ━━━━━━━┓┌ Source ─────────────────────────────────────────────────────┐
+┃    Status     ┃│▸ ● Wi-Fi                                                    │
+┃▸   Source     ┃│    Bluetooth                                                │
+┃    EQ / DSP   ┃│    TV (HDMI)                                                │
+┃    Settings   ┃│    Optical                                                  │
+┃    Network    ┃│    Coaxial                                                  │
+┃               ┃│    Analog                                                   │
+┃               ┃│    USB                                                      │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┃               ┃│                                                             │
+┗━━━━━━━━━━━━━━━┛└─────────────────────────────────────────────────────────────┘
+ ?  Help │  Space  play/pause │  +/-  vol │  m  mute● Living Room LSX II │ Sourc

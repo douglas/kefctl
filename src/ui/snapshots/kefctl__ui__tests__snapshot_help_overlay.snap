@@ -1,0 +1,34 @@
+---
+source: src/ui/mod.rs
+expression: buffer_text(&buf)
+---
+┏ kefctl ━━━━━━━┓┌ Speaker Info ───────────────────────────────────────────────┐
+┃▸   Statu┌ Keybindings ─────────────────────────────────────────────┐         │
+┃    Sourc│  Navigation                                              │         │
+┃    EQ / │    Tab / Shift+Tab     Next / previous panel             │         │
+┃    Setti│    j / k  ↓ / ↑        Move down / up                    │         │
+┃    Netwo│    h / ←               Focus sidebar / back              │         │
+┃         │    l / → / Enter       Focus main panel / select         │         │
+┃         │    Esc                 Back to sidebar                   │         │
+┃         │                                                          │         │
+┃         │  Playback                                                │─────────┘
+┃         │    Space               Play / pause                      │─────────┐
+┃         │    n / p               Next / previous track             │         │
+┃         │    f / b               Seek forward / backward 10s       │         │
+┃         │                                                          │         │
+┃         │  Volume                                                  │         │
+┃         │    + / -               Volume up / down                  │         │
+┃         │    m                   Toggle mute                       │         │
+┃         │                                                          │         │
+┃         │  Panels                                                  │─────────┘
+┃         │    Source              j/k navigate, Enter to switch     │─────────┐
+┃         │    EQ / DSP            j/k navigate, h/l adjust values   │         │
+┃         │    Settings            j/k navigate, h/l cycle options   │         │
+┃         │                                                          │         │
+┃         │  General                                                 │         │
+┃         │    ?                   Show this help                    │         │
+┃         │    q / Ctrl+c          Quit                              │         │
+┃         │                                                          │─────────│
+┃         │                                                          │olume    │
+┗━━━━━━━━━└ ? or Esc to close ───────────────────────────────────────┘─────────┘
+ ?  Help │  Space  play/pause │  +/-  vol │  m  mute● Living Room LSX II │ Statu
