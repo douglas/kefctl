@@ -118,4 +118,37 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.ui.refresh_ms, 1000);
     }
+
+    #[test]
+    fn wrong_type_for_refresh_ms() {
+        let toml = r#"
+            [ui]
+            refresh_ms = "not_a_number"
+        "#;
+        let result = Config::load_from_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn wrong_type_for_ip() {
+        // ip expects a string; giving an integer should fail
+        let toml = r"
+            [speaker]
+            ip = 12345
+        ";
+        let result = Config::load_from_str(toml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn nested_invalid_structure() {
+        // speaker.ip is a flat string, not a table
+        let toml = r#"
+            [speaker]
+            [speaker.ip]
+            addr = "1.2.3.4"
+        "#;
+        let result = Config::load_from_str(toml);
+        assert!(result.is_err());
+    }
 }
