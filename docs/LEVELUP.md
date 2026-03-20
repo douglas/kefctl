@@ -439,7 +439,7 @@ SIGUSR1 Listener ─────────────┘
 
 The main loop receives events and dispatches:
 - **`Event::Key`** → `app.handle_key()` → returns `Option<Action>` → `dispatch_action()`
-- **`Event::Tick`** → `app.tick()` (advance progress bar, dismiss notifications)
+- **`Event::Tick`** → `app.tick()` (dismiss notifications)
 - **`Event::SpeakerUpdate`** → replace `app.speaker` with fresh state from poll
 - **`Event::SpeakerError`** → show notification, mark disconnected
 - **`Event::ThemeChanged`** → reload theme from Omarchy colors.toml

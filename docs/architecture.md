@@ -86,7 +86,6 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | `types.rs` | `ApiValue` tagged union serde, `Source`, `StandbyMode`, `CableMode`, `EqProfile` |
 | `volume.rs` | `get_volume`, `set_volume`, `get_max_volume`, `get_mute`, `set_mute` |
 | `source.rs` | `get_source`, `set_source` |
-| `playback.rs` | `play`, `pause`, `next_track`, `previous_track`, `seek` |
 | `settings.rs` | `get/set_standby_mode`, `get/set_cable_mode`, LED, startup tone |
 | `paths.rs` | API path string constants |
 | `events.rs` | `subscribe`, `poll_events` (long-poll), `unsubscribe` |
@@ -98,7 +97,7 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | `mod.rs` | Top-level layout (sidebar + main), footer bar, notification overlay |
 | `theme.rs` | `Theme` struct (13 color fields), Omarchy loader, `block()` / `info_row()` / `section_block()` helpers |
 | `sidebar.rs` | Panel navigation list with focus highlighting |
-| `status.rs` | Speaker info, settings summary, now playing + progress bar |
+| `status.rs` | Speaker info, settings summary |
 | `source.rs` | Input source selector with active marker |
 | `eq.rs` | EQ parameter editor (treble, bass ext, desk/wall mode, sub, phase) |
 | `settings.rs` | Settings editor (cable, standby, max vol, LED, startup tone) |

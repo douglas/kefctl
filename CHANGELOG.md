@@ -12,6 +12,13 @@ All notable changes to kefctl will be documented in this file.
 - Extracted pure `extract_string`/`extract_i32`/`extract_bool` functions in `kef_api/mod.rs` for testability
 - Fixed tilde `PathBuf` fallback in config (`~/` doesn't expand in `PathBuf::from`)
 
+### Removed
+
+- Now-playing display, progress bar, and playback controls (Space/n/p/f/b) — kefctl is a speaker settings app, not a media player. Playback is handled by Spotify/Roon/AirPlay.
+- `kef_api/playback.rs` module, `PLAYER_DATA`/`PLAYER_CONTROL` API paths
+- `artist`, `track`, `duration`, `position`, `playing` fields from `SpeakerState`
+- `progress_filled`/`progress_empty` from Theme (no longer needed without progress bar)
+
 ### Added
 
 - Cached speaker IP: after a successful connection, the speaker IP is saved to `~/.local/state/kefctl/last_speaker` and tried first on next launch, skipping 5-second mDNS discovery

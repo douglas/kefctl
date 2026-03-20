@@ -51,14 +51,11 @@ Press `?` in the app for the full keybindings overlay.
 | `Esc` | Back to sidebar |
 | `+` / `-` | Volume up/down |
 | `m` | Toggle mute |
-| `Space` | Play/pause |
-| `n` / `p` | Next/previous track |
-| `f` / `b` | Seek forward/backward 10s |
 | `←` / `→` | Adjust value (EQ/Settings panels) |
 
 ## Panels
 
-- **Status** — Speaker info, settings summary, now playing with progress bar
+- **Status** — Speaker info, settings summary
 - **Source** — Select input source (Wi-Fi, Bluetooth, USB, TV, Optical, Coaxial, Analog)
 - **EQ / DSP** — Treble, bass extension, desk/wall mode, subwoofer settings, phase correction
 - **Settings** — Cable mode, standby timeout, max volume, front LED, startup tone
@@ -86,7 +83,6 @@ src/
 │   ├── types.rs     # ApiValue tagged union, Source, StandbyMode, EqProfile
 │   ├── volume.rs    # Volume get/set
 │   ├── source.rs    # Source get/set
-│   ├── playback.rs  # Play/pause/next/prev/seek
 │   ├── settings.rs  # Cable mode, standby, LED, startup tone
 │   ├── paths.rs     # API path constants
 │   └── events.rs    # Event subscribe/poll/unsubscribe
@@ -94,7 +90,7 @@ src/
     ├── mod.rs       # Layout, footer, notification overlay
     ├── theme.rs     # Theme struct, Omarchy loader, SIGUSR1 reload
     ├── sidebar.rs   # Panel navigation list
-    ├── status.rs    # Speaker info + settings summary + now playing
+    ├── status.rs    # Speaker info + settings summary
     ├── source.rs    # Source selector list
     ├── eq.rs        # EQ parameter editor
     ├── settings.rs  # Settings editor
@@ -153,7 +149,7 @@ chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
 
 | Omarchy key | Theme fields |
 |-------------|-------------|
-| `accent` | Focused borders, highlights, progress bar |
+| `accent` | Focused borders, highlights |
 | `foreground` | Primary text |
 | `color1` | Error/disconnected status |
 | `color2` | OK/connected status |
@@ -173,7 +169,7 @@ chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
 git clone https://github.com/douglas/kefctl.git
 cd kefctl
 cargo run -- --demo        # No speaker needed
-cargo test                 # Run 99 tests (app state, UI rendering, types, API, errors, config, snapshots)
+cargo test                 # Run 95 tests (app state, UI rendering, types, API, errors, config, snapshots)
 cargo clippy               # Lint
 ```
 
