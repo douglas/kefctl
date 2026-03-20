@@ -12,14 +12,14 @@ use crate::ui::theme::Theme;
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::vertical([
         Constraint::Length(7),
-        Constraint::Min(8),
         Constraint::Length(9),
+        Constraint::Min(8),
     ])
     .split(area);
 
     draw_speaker_info(frame, app, chunks[0]);
-    draw_now_playing(frame, app, chunks[1]);
-    draw_settings_summary(frame, app, chunks[2]);
+    draw_settings_summary(frame, app, chunks[1]);
+    draw_now_playing(frame, app, chunks[2]);
 }
 
 fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {

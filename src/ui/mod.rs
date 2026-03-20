@@ -76,7 +76,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         Span::styled(
             " ? ",
             Style::default()
-                .fg(theme.badge_fg)
+                .fg(theme.fg)
                 .bg(theme.badge_bg)
                 .add_modifier(Modifier::BOLD),
         ),
@@ -97,7 +97,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             spans.push(Span::styled(
                 format!(" {key} "),
                 Style::default()
-                    .fg(theme.badge_fg)
+                    .fg(theme.fg)
                     .bg(theme.badge_bg)
                     .add_modifier(Modifier::BOLD),
             ));
