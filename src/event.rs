@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 
 use crate::app::SpeakerState;
 use crate::kef_api::KefClient;
+use crate::kef_api::paths as api;
 
 #[derive(Debug)]
 pub enum Event {
@@ -97,12 +98,12 @@ impl EventHandler {
 async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Event>) {
     // Subscribe to key state changes
     let paths = &[
-        "player:volume",
-        "player:player/data",
-        "settings:/kef/play/physicalSource",
-        "settings:/kef/host/speakerStatus",
-        "settings:/mediaPlayer/mute",
-        "settings:/kef/host/cableMode",
+        api::VOLUME,
+        api::PLAYER_DATA,
+        api::SOURCE,
+        api::SPEAKER_STATUS,
+        api::MUTE,
+        api::CABLE_MODE,
     ];
 
     loop {

@@ -189,7 +189,7 @@ fn dispatch_action(client: Arc<KefClient>, action: Action) {
             Action::SetMaxVolume(v) => {
                 client
                     .set_data(
-                        "settings:/kef/host/maximumVolume",
+                        kef_api::paths::MAX_VOLUME,
                         kef_api::types::ApiValue::i32(v),
                     )
                     .await

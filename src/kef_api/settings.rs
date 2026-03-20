@@ -1,10 +1,11 @@
 use crate::error::KefError;
 use super::KefClient;
+use super::paths;
 use super::types::{ApiValue, CableMode, StandbyMode};
 
 impl KefClient {
     pub async fn get_cable_mode(&self) -> Result<CableMode, KefError> {
-        let data = self.get_data("settings:/kef/host/cableMode").await?;
+        let data = self.get_data(paths::CABLE_MODE).await?;
         match data.into_iter().next() {
             Some(ApiValue::CableMode { value }) => Ok(value),
             _ => Ok(CableMode::default()),
@@ -12,7 +13,7 @@ impl KefClient {
     }
 
     pub async fn get_standby_mode(&self) -> Result<StandbyMode, KefError> {
-        let data = self.get_data("settings:/kef/host/standbyMode").await?;
+        let data = self.get_data(paths::STANDBY_MODE).await?;
         match data.into_iter().next() {
             Some(ApiValue::StandbyMode { value }) => Ok(value),
             _ => Ok(StandbyMode::default()),
@@ -20,34 +21,25 @@ impl KefClient {
     }
 
     pub async fn set_standby_mode(&self, mode: StandbyMode) -> Result<(), KefError> {
-        self.set_data(
-            "settings:/kef/host/standbyMode",
-            ApiValue::StandbyMode { value: mode },
-        )
-        .await
+        self.set_data(paths::STANDBY_MODE, ApiValue::StandbyMode { value: mode })
+            .await
     }
 
     pub async fn get_front_led_disabled(&self) -> Result<bool, KefError> {
-        self.get_bool("settings:/kef/host/disableFrontStandbyLED").await
+        self.get_bool(paths::FRONT_LED).await
     }
 
     pub async fn set_front_led_disabled(&self, disabled: bool) -> Result<(), KefError> {
-        self.set_data(
-            "settings:/kef/host/disableFrontStandbyLED",
-            ApiValue::bool(disabled),
-        )
-        .await
+        self.set_data(paths::FRONT_LED, ApiValue::bool(disabled))
+            .await
     }
 
     pub async fn get_startup_tone(&self) -> Result<bool, KefError> {
-        self.get_bool("settings:/kef/host/startupTone").await
+        self.get_bool(paths::STARTUP_TONE).await
     }
 
     pub async fn set_startup_tone(&self, enabled: bool) -> Result<(), KefError> {
-        self.set_data(
-            "settings:/kef/host/startupTone",
-            ApiValue::bool(enabled),
-        )
-        .await
+        self.set_data(paths::STARTUP_TONE, ApiValue::bool(enabled))
+            .await
     }
 }

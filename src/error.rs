@@ -8,6 +8,12 @@ pub enum KefError {
     #[error("API error (status {status}): {message}")]
     Api { status: u16, message: String },
 
+    #[error("type mismatch: expected {expected}, got {got}")]
+    TypeMismatch {
+        expected: &'static str,
+        got: String,
+    },
+
     #[error("discovery error: {0}")]
     Discovery(String),
 

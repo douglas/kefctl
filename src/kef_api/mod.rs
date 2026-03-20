@@ -1,4 +1,5 @@
 pub mod events;
+pub mod paths;
 pub mod playback;
 pub mod settings;
 pub mod source;
@@ -79,7 +80,14 @@ impl KefClient {
         let data = self.get_data(path).await?;
         match data.into_iter().next() {
             Some(ApiValue::String { value }) => Ok(value),
-            _ => Ok(String::new()),
+            Some(other) => Err(KefError::TypeMismatch {
+                expected: "string",
+                got: format!("{other:?}"),
+            }),
+            None => Err(KefError::TypeMismatch {
+                expected: "string",
+                got: "empty response".to_string(),
+            }),
         }
     }
 
@@ -87,7 +95,14 @@ impl KefClient {
         let data = self.get_data(path).await?;
         match data.into_iter().next() {
             Some(ApiValue::I32 { value }) => Ok(value),
-            _ => Ok(0),
+            Some(other) => Err(KefError::TypeMismatch {
+                expected: "i32",
+                got: format!("{other:?}"),
+            }),
+            None => Err(KefError::TypeMismatch {
+                expected: "i32",
+                got: "empty response".to_string(),
+            }),
         }
     }
 
@@ -95,15 +110,22 @@ impl KefClient {
         let data = self.get_data(path).await?;
         match data.into_iter().next() {
             Some(ApiValue::Bool { value }) => Ok(value),
-            _ => Ok(false),
+            Some(other) => Err(KefError::TypeMismatch {
+                expected: "bool",
+                got: format!("{other:?}"),
+            }),
+            None => Err(KefError::TypeMismatch {
+                expected: "bool",
+                got: "empty response".to_string(),
+            }),
         }
     }
 
     pub async fn fetch_full_state(&self) -> Result<SpeakerState, KefError> {
         let (name, firmware, mac, source, volume, muted, cable_mode, max_volume) = tokio::try_join!(
-            self.get_string("settings:/deviceName"),
-            self.get_string("settings:/releasetext"),
-            self.get_string("settings:/system/primaryMacAddress"),
+            self.get_string(paths::DEVICE_NAME),
+            self.get_string(paths::FIRMWARE),
+            self.get_string(paths::MAC_ADDRESS),
             self.get_source(),
             self.get_volume(),
             self.get_mute(),
