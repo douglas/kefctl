@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use crossterm::event::{Event as CrosstermEvent, EventStream, KeyEvent};
@@ -5,6 +6,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 
 use crate::app::SpeakerState;
+use crate::kef_api::KefClient;
 
 #[derive(Debug)]
 pub enum Event {
@@ -20,9 +22,11 @@ pub struct EventHandler {
 }
 
 impl EventHandler {
-    pub fn new(tick_rate: Duration) -> Self {
+    pub fn new(tick_rate: Duration, client: Option<Arc<KefClient>>) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
 
+        // Terminal event + tick task
+        let tx_term = tx.clone();
         tokio::spawn(async move {
             let mut reader = EventStream::new();
             let mut tick_interval = tokio::time::interval(tick_rate);
@@ -30,19 +34,19 @@ impl EventHandler {
             loop {
                 tokio::select! {
                     _ = tick_interval.tick() => {
-                        if tx.send(Event::Tick).is_err() {
+                        if tx_term.send(Event::Tick).is_err() {
                             break;
                         }
                     }
                     event = reader.next() => {
                         match event {
                             Some(Ok(CrosstermEvent::Key(key))) => {
-                                if tx.send(Event::Key(key)).is_err() {
+                                if tx_term.send(Event::Key(key)).is_err() {
                                     break;
                                 }
                             }
                             Some(Ok(CrosstermEvent::Resize(w, h))) => {
-                                if tx.send(Event::Resize(w, h)).is_err() {
+                                if tx_term.send(Event::Resize(w, h)).is_err() {
                                     break;
                                 }
                             }
@@ -55,10 +59,71 @@ impl EventHandler {
             }
         });
 
+        // Speaker poll task (only if we have a client)
+        if let Some(client) = client {
+            let tx_speaker = tx;
+            tokio::spawn(async move {
+                speaker_poll_loop(client, tx_speaker).await;
+            });
+        }
+
         Self { rx }
     }
 
     pub async fn next(&mut self) -> Option<Event> {
         self.rx.recv().await
+    }
+}
+
+async fn speaker_poll_loop(client: Arc<KefClient>, tx: mpsc::UnboundedSender<Event>) {
+    // Subscribe to key state changes
+    let paths = &[
+        "player:volume",
+        "player:player/data",
+        "settings:/kef/play/physicalSource",
+        "settings:/kef/host/speakerStatus",
+        "settings:/mediaPlayer/mute",
+        "settings:/kef/host/cableMode",
+    ];
+
+    loop {
+        let queue_id = match client.subscribe(paths).await {
+            Ok(id) => id,
+            Err(e) => {
+                let _ = tx.send(Event::SpeakerError(format!("Subscribe failed: {e}")));
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+        };
+
+        // Poll loop
+        loop {
+            match client.poll_events(&queue_id, 5000).await {
+                Ok(_events) => {
+                    // On any event, re-fetch full state for simplicity
+                    // A more sophisticated approach would parse individual events
+                    match client.fetch_full_state().await {
+                        Ok(state) => {
+                            if tx.send(Event::SpeakerUpdate(Box::new(state))).is_err() {
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            let _ =
+                                tx.send(Event::SpeakerError(format!("State fetch failed: {e}")));
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Event::SpeakerError(format!("Poll failed: {e}")));
+                    // Break inner loop to re-subscribe
+                    break;
+                }
+            }
+        }
+
+        // Unsubscribe (best effort) and retry after delay
+        let _ = client.unsubscribe(&queue_id).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
