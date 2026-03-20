@@ -177,7 +177,32 @@ tokio::spawn(async move {
 });
 ```
 
-**In kefctl:** `fetch_full_state()` uses `tokio::try_join!` to fetch all settings in parallel. Action dispatch uses `tokio::spawn` for fire-and-forget API calls. The event loop in `event.rs` uses `tokio::select!` to wait on multiple event sources.
+**In kefctl:** `fetch_full_state()` uses `tokio::try_join!` to fetch all settings in parallel. Action dispatch uses `tokio::spawn` with error feedback through the event channel. The event loop in `event.rs` uses `tokio::select!` to wait on multiple event sources.
+
+### Graceful shutdown with CancellationToken
+
+When the user quits, all spawned tasks need to stop cleanly. kefctl uses `CancellationToken` from `tokio-util`:
+
+```rust
+use tokio_util::sync::CancellationToken;
+
+let cancel = CancellationToken::new();
+let token = cancel.clone();  // clone for each spawned task
+
+tokio::spawn(async move {
+    loop {
+        tokio::select! {
+            () = token.cancelled() => break,  // stop when cancelled
+            _ = do_work() => { /* process result */ }
+        }
+    }
+});
+
+// Later, to shut down all tasks:
+cancel.cancel();
+```
+
+**In kefctl:** `EventHandler` in `event.rs` creates a `CancellationToken` and shares clones with the terminal event task, speaker poll task, and SIGUSR1 listener. Calling `events.shutdown()` cancels all three at once. This is safer than dropping channels or using atomic bools — the `select!` ensures tasks check for cancellation at every await point.
 
 ## 3. Serde (JSON serialization)
 
@@ -318,6 +343,8 @@ fn handle_key(key: KeyEvent) {
 
 **In kefctl:** All keyboard handling is in `app.rs` → `handle_key()`. It dispatches to panel-specific handlers based on `self.focus` and `self.panel`.
 
+**Important:** Crossterm emits `Press`, `Repeat`, and `Release` events. kefctl filters for `KeyEventKind::Press` only in `event.rs` to avoid double-processing. If you handle raw crossterm events elsewhere, always check `key.kind == KeyEventKind::Press`.
+
 ## 6. Clap (CLI parsing)
 
 Like Ruby's `OptionParser` but derived from struct definitions.
@@ -340,7 +367,274 @@ struct Cli {
 
 **In kefctl:** See `cli.rs`. Run `cargo run -- --help` to see the generated help.
 
-## 7. Practical Workflow
+### ValueEnum for typed arguments
+
+When a CLI argument has a fixed set of choices (like source names), use `ValueEnum` instead of parsing strings manually:
+
+```rust
+use clap::ValueEnum;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SourceArg {
+    Usb,
+    Wifi,
+    Bluetooth,
+}
+
+// In the subcommand:
+Source {
+    #[arg(value_enum)]
+    source: Option<SourceArg>,
+}
+```
+
+Clap automatically validates input, generates help text with valid values, and enables shell tab completion. No manual `match` block needed.
+
+**In kefctl:** `SourceArg` in `cli.rs` uses this pattern. The `cmd_set_source` function in `main.rs` converts `SourceArg` → `Source` with a simple match.
+
+## 7. Error Handling (thiserror)
+
+kefctl defines all errors in `error.rs` using the `thiserror` crate:
+
+```rust
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum KefError {
+    #[error("network error: {0}")]           // Display format
+    Network(#[from] reqwest::Error),          // auto-converts from reqwest errors
+
+    #[error("API error (status {status}): {message}")]
+    Api { status: u16, message: String },     // structured variant with named fields
+
+    #[error("type mismatch: expected {expected}, got {got}")]
+    TypeMismatch { expected: &'static str, got: String },
+
+    #[error("discovery error: {0}")]
+    Discovery(String),
+
+    #[error("config error: {0}")]
+    Config(#[from] toml::de::Error),          // auto-converts from toml errors
+}
+```
+
+Key patterns:
+- **`#[from]`** — auto-generates `From<T>` so the `?` operator works: `let resp = client.get(url).send().await?;` converts `reqwest::Error` → `KefError::Network` automatically
+- **`#[error("...")]`** — generates the `Display` implementation (what the user sees)
+- **Named struct variants** — for errors with multiple fields (like `Api { status, message }`)
+
+**Adding a new error variant:** Add it to the enum, add the `#[error]` format string, and if it wraps another error type, add `#[from]`.
+
+## 8. Architecture Patterns
+
+### Event loop
+
+The TUI runs an async event loop in `main.rs` → `run_tui_loop`. Three concurrent tasks feed events into a single `mpsc` channel:
+
+```
+Terminal Events (crossterm) ──┐
+Speaker Poll (HTTP long-poll) ──┼──→ mpsc channel ──→ Event Handler ──→ App state
+SIGUSR1 Listener ─────────────┘
+```
+
+The main loop receives events and dispatches:
+- **`Event::Key`** → `app.handle_key()` → returns `Option<Action>` → `dispatch_action()`
+- **`Event::Tick`** → `app.tick()` (advance progress bar, dismiss notifications)
+- **`Event::SpeakerUpdate`** → replace `app.speaker` with fresh state from poll
+- **`Event::SpeakerError`** → show notification, mark disconnected
+- **`Event::ThemeChanged`** → reload theme from Omarchy colors.toml
+
+### Optimistic updates with error feedback
+
+When the user presses a key (e.g., volume up):
+
+1. `app.handle_key()` updates `SpeakerState` **immediately** (instant UI feedback)
+2. Returns `Some(Action::SetVolume(51))` to the main loop
+3. `dispatch_action()` spawns an async HTTP request via `tokio::spawn`
+4. If the API call **succeeds**: the speaker poll loop confirms the value on next poll
+5. If the API call **fails**: error is sent back via `tx.send(Event::SpeakerError(...))`, shown as a TUI notification
+
+This is not fire-and-forget — errors bubble back to the user.
+
+### Speaker resolution chain
+
+The speaker IP is resolved in order (first match wins):
+
+1. `--speaker <ip>` CLI flag
+2. `speaker.ip` in `~/.config/kefctl/config.toml`
+3. mDNS discovery (`_kef-info._tcp.local.`) — uses first speaker found
+
+### Visibility: `pub(crate)`
+
+kefctl is a single binary — nothing is used outside the crate. All public items use `pub(crate)` instead of `pub` to prevent accidental API surface. When adding new structs, enums, or functions, use `pub(crate)` unless they're private to the module.
+
+### `#[must_use]` on action-producing functions
+
+`handle_key()` returns `Option<Action>` that must be dispatched to the API. The `#[must_use]` attribute makes the compiler warn if you accidentally drop the return value:
+
+```rust
+#[must_use]
+pub(crate) fn handle_key(&mut self, key: KeyEvent) -> Option<Action> { ... }
+```
+
+## 9. Theme System
+
+All colors flow through `app.theme` (a `Theme` struct with 13 color fields). The `theme.block(title, focused)` helper builds styled borders. `theme.info_row(label, value)` and `theme.section_block(title)` provide consistent styling across panels.
+
+### Omarchy integration
+
+If [Omarchy](https://github.com/basecamp/omarchy) is installed, colors are read from `~/.config/omarchy/current/theme/colors.toml`. Missing colors fall back to defaults — the theme loads partially rather than failing entirely.
+
+### Live reload via SIGUSR1
+
+The event loop spawns a SIGUSR1 listener. When the signal fires, it sends `Event::ThemeChanged`, which triggers `Theme::load()`. To reload:
+
+```sh
+pkill -USR1 kefctl
+```
+
+Omarchy can trigger this automatically when themes change via a hook in `~/.config/omarchy/hooks/theme-set.d/kefctl`.
+
+## 10. Logging and Debugging
+
+### Log file
+
+The TUI owns stdout, so all logging goes to `~/.local/state/kefctl/kefctl.log`. The `tracing` crate is used instead of `println!`.
+
+### KEFCTL_LOG environment variable
+
+Control log verbosity at runtime without recompiling:
+
+```sh
+# Default: info level for kefctl
+cargo run -- --demo
+
+# Debug logging for everything
+KEFCTL_LOG=debug cargo run -- --demo
+
+# Trace API calls only
+KEFCTL_LOG=kefctl::kef_api=trace cargo run -- --speaker 192.168.50.17
+
+# Silence everything except warnings
+KEFCTL_LOG=warn cargo run -- --demo
+```
+
+The filter syntax is from `tracing_subscriber::EnvFilter` — `module=level` pairs separated by commas.
+
+### #[tracing::instrument]
+
+Key async API methods are annotated with `#[tracing::instrument]` which automatically creates a span with the function name and arguments:
+
+```rust
+#[tracing::instrument(skip(self), fields(path))]
+pub async fn get_data(&self, path: &str) -> Result<GetDataResponse, KefError> { ... }
+```
+
+`skip(self)` avoids printing the entire `KefClient` struct. The span survives across `.await` points, so all log entries within the function are correlated.
+
+**When adding new API methods**, add `#[tracing::instrument(skip(self))]` for automatic structured logging.
+
+### Debugging against a real speaker
+
+```sh
+# Watch logs in real time
+tail -f ~/.local/state/kefctl/kefctl.log
+
+# Test API endpoints directly
+curl -s 'http://192.168.50.17/api/getData?path=settings:/deviceName&roles=value' | python3 -m json.tool
+
+# Use kefw2 Go CLI for quick speaker checks
+kefw2 -s 192.168.50.17 info
+```
+
+## 11. Testing
+
+kefctl has 99 tests across several categories.
+
+### Test organization
+
+Tests live inside each module in `#[cfg(test)] mod tests { ... }` blocks. This is standard Rust — tests are co-located with the code they test.
+
+### Unit tests (state, types, config, errors)
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app() -> App { App::new_demo() }  // helper: creates a demo app
+
+    fn key(code: KeyCode) -> KeyEvent {  // helper: creates a key event
+        KeyEvent { code, modifiers: KeyModifiers::NONE, kind: KeyEventKind::Press, state: KeyEventState::NONE }
+    }
+
+    #[test]
+    fn volume_up_clamped_at_max() {
+        let mut a = app();
+        a.speaker.volume = a.speaker.max_volume;
+        a.handle_key(key(KeyCode::Char('+')));
+        assert_eq!(a.speaker.volume, a.speaker.max_volume);
+    }
+}
+```
+
+**In kefctl:** `app.rs` has ~30 tests for keyboard handling and state transitions. `types.rs` has ~20 tests for serde roundtrips. `config.rs` has 9 tests for parsing. `error.rs` has 4 tests for Display formatting.
+
+### UI rendering tests (TestBackend)
+
+Ratatui's `TestBackend` renders to an in-memory buffer instead of a real terminal:
+
+```rust
+fn render_app(app: &mut App, width: u16, height: u16) -> ratatui::buffer::Buffer {
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|frame| super::draw(frame, app)).unwrap();
+    terminal.backend().buffer().clone()
+}
+
+#[test]
+fn status_panel_renders() {
+    let mut app = App::new_demo();
+    let buf = render_app(&mut app, 80, 24);
+    let text = buffer_text(&buf);
+    assert!(text.contains("Living Room LSX II"));
+}
+```
+
+### Snapshot tests (insta)
+
+For visual regression testing, kefctl uses the `insta` crate. Snapshot tests capture the full rendered output and compare against a saved `.snap` file:
+
+```rust
+#[test]
+fn snapshot_status_panel() {
+    let mut app = App::new_demo();
+    app.select_panel(Panel::Status);
+    let buf = render_app(&mut app, 80, 24);
+    insta::assert_snapshot!(buffer_text(&buf));
+}
+```
+
+Snapshots are stored in `src/ui/snapshots/`. When a UI change causes a snapshot mismatch:
+
+```sh
+cargo test                     # fails with diff
+cargo insta review             # interactive review: accept or reject each change
+cargo insta accept             # accept all pending changes
+```
+
+**When you change UI rendering**, run `cargo test` and review the snapshot diffs. If the change is intentional, accept the new snapshots.
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR:
+
+1. `cargo clippy --all-targets -- -D warnings` — lint with warnings as errors
+2. `cargo test` — all 99 tests including snapshot tests
+3. `cargo doc --no-deps` — verify documentation builds cleanly
+4. `cargo build --release` — verify release build with LTO
+
+## 12. Practical Workflow
 
 ### Making a change
 
@@ -360,20 +654,6 @@ cargo clippy
 cargo test
 ```
 
-### Debugging
-
-```sh
-# Check logs (TUI takes over stdout, so logs go to file)
-tail -f ~/.local/state/kefctl/kefctl.log
-
-# Test API endpoints directly
-curl -s 'http://192.168.50.17/api/getData?path=settings:/deviceName&roles=value' | python3 -m json.tool
-
-# Use kefw2 Go CLI for quick speaker checks
-kefw2 -s 192.168.50.17 info
-kefw2 -s 192.168.50.17 status
-```
-
 ### Common compiler errors and fixes
 
 | Error | Fix |
@@ -384,6 +664,7 @@ kefw2 -s 192.168.50.17 status
 | "non-exhaustive match" | Add the missing enum variant to your `match` |
 | "unused variable" | Prefix with `_` like `_unused` or remove it |
 | "trait not imported" | Add `use` for the trait (compiler suggests it) |
+| "unused must_use" | Handle the return value (e.g., `let _ = ...` if intentional) |
 
 ### Cargo commands cheat sheet
 
@@ -396,8 +677,42 @@ kefw2 -s 192.168.50.17 status
 | `cargo clippy` | `rubocop` |
 | `cargo doc --open` | `yard doc` |
 | `cargo add serde` | `bundle add serde` (adds to Cargo.toml) |
+| `cargo insta review` | — (review snapshot test changes) |
 
-## 8. Where to Go Next
+## 13. How-To Guides
+
+### Adding a new panel
+
+1. Create `src/ui/mypanel.rs` with `pub fn draw(frame, app, area)`
+2. Add variant to `Panel` enum in `app.rs`, update `ALL`, `label()`, `index()`
+3. Wire it in `ui/mod.rs` match and `app.rs` keyboard handling
+4. Use `theme.block(title, focused)` for borders, `app.theme.*` for colors
+5. Add a snapshot test in `ui/mod.rs` tests
+6. Run `cargo insta accept` to save the initial snapshot
+
+### Adding a new API field
+
+1. Add the field to `SpeakerState` in `app.rs`
+2. Test the API endpoint: `curl -s 'http://<ip>/api/getData?path=<path>&roles=value'`
+3. Add an `ApiValue` variant in `types.rs` if it's a new type (both `#[serde(tag)]` and `#[serde(rename)]` are needed — follow existing patterns)
+4. Fetch it in `fetch_full_state()` in `kef_api/mod.rs`
+5. Display it in the relevant `ui/*.rs` panel
+
+### Adding a new CLI subcommand
+
+1. Add the variant to `Commands` enum in `cli.rs`
+2. Add a handler function in `main.rs`
+3. Wire it in the `match cli.command` block in `main()`
+4. For enum arguments, use `#[derive(ValueEnum)]` + `#[arg(value_enum)]`
+
+### Adding a new error variant
+
+1. Add the variant to `KefError` in `error.rs`
+2. Add `#[error("...")]` format string
+3. If wrapping another error type, add `#[from]` for automatic `?` conversion
+4. Add a Display test in `error.rs` tests
+
+## 14. Where to Go Next
 
 - [The Rust Book](https://doc.rust-lang.org/book/) — chapters 1-10 cover everything in kefctl
 - [Rust by Example](https://doc.rust-lang.org/rust-by-example/) — learn by reading code
@@ -405,3 +720,6 @@ kefw2 -s 192.168.50.17 status
 - [Ratatui book](https://ratatui.rs/) — tutorials and recipes
 - [Tokio tutorial](https://tokio.rs/tokio/tutorial) — async runtime used in kefctl
 - [Serde guide](https://serde.rs/) — serialization framework
+- [thiserror docs](https://docs.rs/thiserror/latest/thiserror/) — error derive macro
+- [insta docs](https://insta.rs/) — snapshot testing
+- [tracing docs](https://docs.rs/tracing/latest/tracing/) — structured logging
