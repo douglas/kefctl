@@ -22,6 +22,7 @@ use kef_api::KefClient;
 use kef_api::types::Source;
 
 fn main() {
+    init_logging();
     let cli = Cli::parse();
     let config = match Config::load() {
         Ok(c) => c,
@@ -166,7 +167,7 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
                 app.connection = app::ConnectionState::Connected;
             }
             Some(Event::SpeakerError(msg)) => {
-                app.notification = Some(msg);
+                app.set_notification(msg);
                 app.connection = app::ConnectionState::Disconnected;
             }
             None => break,
@@ -205,6 +206,32 @@ fn dispatch_action(client: Arc<KefClient>, action: Action) {
             tracing::warn!("API action failed: {e}");
         }
     });
+}
+
+fn init_logging() {
+    // Log to file so stdout stays clean for TUI
+    let state_dir = dirs::state_dir()
+        .or_else(dirs::data_local_dir)
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join("kefctl");
+    let _ = std::fs::create_dir_all(&state_dir);
+    let log_path = state_dir.join("kefctl.log");
+
+    if let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        use tracing_subscriber::fmt;
+        use tracing_subscriber::prelude::*;
+
+        let file_layer = fmt::layer()
+            .with_writer(std::sync::Mutex::new(file))
+            .with_ansi(false);
+
+        tracing_subscriber::registry().with(file_layer).init();
+        tracing::debug!("kefctl logging initialized to {}", log_path.display());
+    }
 }
 
 async fn cmd_discover() {
