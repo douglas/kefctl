@@ -170,6 +170,8 @@ impl App {
     pub fn new_demo() -> Self {
         let mut sidebar_state = ListState::default();
         sidebar_state.select(Some(0));
+        let mut source_list_state = ListState::default();
+        source_list_state.select(Some(0));
 
         Self {
             speaker: SpeakerState::demo(),
@@ -177,7 +179,7 @@ impl App {
             connection: ConnectionState::Connected,
             focus: Focus::Sidebar,
             sidebar_state,
-            source_list_state: ListState::default(),
+            source_list_state,
             eq_focus: 0,
             settings_focus: 0,
             network_speakers: vec![],
@@ -284,13 +286,181 @@ impl App {
     }
 
     fn handle_key_main(&mut self, key: KeyEvent) {
+        // Esc always returns to sidebar
+        if key.code == KeyCode::Esc {
+            self.focus = Focus::Sidebar;
+            return;
+        }
+
+        match self.panel {
+            Panel::Status => {
+                if key.code == KeyCode::Char('h') {
+                    self.focus = Focus::Sidebar;
+                }
+            }
+            Panel::Source => self.handle_key_source(key),
+            Panel::Eq => self.handle_key_eq(key),
+            Panel::Settings => self.handle_key_settings(key),
+            Panel::Network => {
+                if key.code == KeyCode::Char('h') {
+                    self.focus = Focus::Sidebar;
+                }
+            }
+        }
+    }
+
+    fn handle_key_source(&mut self, key: KeyEvent) {
+        let count = Source::ALL.len();
         match key.code {
-            KeyCode::Char('h') | KeyCode::Left | KeyCode::Esc => {
-                self.focus = Focus::Sidebar;
+            KeyCode::Char('j') | KeyCode::Down => {
+                let i = self.source_list_state.selected().unwrap_or(0);
+                self.source_list_state.select(Some((i + 1) % count));
             }
-            _ => {
-                // Panel-specific keys will be added in Phase 7
+            KeyCode::Char('k') | KeyCode::Up => {
+                let i = self.source_list_state.selected().unwrap_or(0);
+                self.source_list_state
+                    .select(Some(if i == 0 { count - 1 } else { i - 1 }));
             }
+            KeyCode::Enter => {
+                if let Some(i) = self.source_list_state.selected() {
+                    if i < count {
+                        self.speaker.source = Source::ALL[i];
+                        // Phase 8 will fire the API call
+                    }
+                }
+            }
+            KeyCode::Char('h') => self.focus = Focus::Sidebar,
+            _ => {}
+        }
+    }
+
+    fn handle_key_eq(&mut self, key: KeyEvent) {
+        let max_focus = 6; // 0-6 are the editable rows
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if self.eq_focus < max_focus {
+                    self.eq_focus += 1;
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if self.eq_focus > 0 {
+                    self.eq_focus -= 1;
+                }
+            }
+            KeyCode::Right | KeyCode::Char('l') => self.eq_adjust(1),
+            KeyCode::Left | KeyCode::Char('h') if self.eq_focus > 0 => self.eq_adjust(-1),
+            KeyCode::Char('h') => self.focus = Focus::Sidebar,
+            _ => {}
+        }
+    }
+
+    fn eq_adjust(&mut self, dir: i32) {
+        let eq = &mut self.speaker.eq_profile;
+        match self.eq_focus {
+            0 => {} // Profile name — not adjustable inline
+            1 => {
+                // Treble: -5.0 to +5.0 in 0.5 steps
+                eq.treble = (eq.treble + dir as f64 * 0.5).clamp(-5.0, 5.0);
+            }
+            2 => {
+                // Bass extension
+                eq.bass_extension = if dir > 0 {
+                    eq.bass_extension.cycle_next()
+                } else {
+                    eq.bass_extension.cycle_prev()
+                };
+            }
+            3 => {
+                // Desk mode: toggle on/off, or adjust dB if on
+                if !eq.desk_mode {
+                    eq.desk_mode = true;
+                } else if dir > 0 {
+                    eq.desk_db = (eq.desk_db + 0.5).clamp(-6.0, 0.0);
+                } else {
+                    eq.desk_db = (eq.desk_db - 0.5).clamp(-6.0, 0.0);
+                    if eq.desk_db <= -6.0 {
+                        eq.desk_mode = false;
+                    }
+                }
+            }
+            4 => {
+                // Wall mode: same pattern as desk
+                if !eq.wall_mode {
+                    eq.wall_mode = true;
+                } else if dir > 0 {
+                    eq.wall_db = (eq.wall_db + 0.5).clamp(-6.0, 0.0);
+                } else {
+                    eq.wall_db = (eq.wall_db - 0.5).clamp(-6.0, 0.0);
+                    if eq.wall_db <= -6.0 {
+                        eq.wall_mode = false;
+                    }
+                }
+            }
+            5 => {
+                // Sub out toggle
+                eq.sub_out = !eq.sub_out;
+            }
+            6 => {
+                // Phase correction toggle
+                eq.phase_correction = !eq.phase_correction;
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_key_settings(&mut self, key: KeyEvent) {
+        let max_focus = 4; // 0-4 are the settings rows
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if self.settings_focus < max_focus {
+                    self.settings_focus += 1;
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if self.settings_focus > 0 {
+                    self.settings_focus -= 1;
+                }
+            }
+            KeyCode::Right | KeyCode::Char('l') => self.settings_cycle(1),
+            KeyCode::Left | KeyCode::Char('h') if self.settings_focus > 0 => {
+                self.settings_cycle(-1)
+            }
+            KeyCode::Char('h') => self.focus = Focus::Sidebar,
+            _ => {}
+        }
+    }
+
+    fn settings_cycle(&mut self, dir: i32) {
+        match self.settings_focus {
+            0 => {
+                // Cable mode
+                self.speaker.cable_mode = match self.speaker.cable_mode {
+                    CableMode::Wired => CableMode::Wireless,
+                    CableMode::Wireless => CableMode::Wired,
+                };
+            }
+            1 => {
+                // Standby mode
+                self.speaker.standby_mode = if dir > 0 {
+                    self.speaker.standby_mode.cycle_next()
+                } else {
+                    self.speaker.standby_mode.cycle_prev()
+                };
+            }
+            2 => {
+                // Max volume
+                self.speaker.max_volume =
+                    (self.speaker.max_volume + dir * 5).clamp(10, 100);
+            }
+            3 => {
+                // Front LED
+                self.speaker.front_led = !self.speaker.front_led;
+            }
+            4 => {
+                // Startup tone
+                self.speaker.startup_tone = !self.speaker.startup_tone;
+            }
+            _ => {}
         }
     }
 }
