@@ -1,7 +1,3 @@
-use std::time::Duration;
-
-use reqwest::Client;
-
 use crate::error::KefError;
 use super::KefClient;
 
@@ -35,13 +31,7 @@ impl KefClient {
         queue_id: &str,
     ) -> Result<Option<serde_json::Value>, KefError> {
         let url = format!("{}/api/event/pollQueue", self.base_url);
-        // Speaker holds connection for up to 30s; give reqwest 60s
-        let poll_client = Client::builder()
-            .timeout(Duration::from_secs(60))
-            .build()
-            .expect("failed to create poll client");
-
-        let result = poll_client
+        let result = self.poll_client
             .get(&url)
             .query(&[
                 ("queueId", queue_id),

@@ -18,6 +18,7 @@ pub struct KefClient {
     base_url: String,
     ip: IpAddr,
     client: Client,
+    poll_client: Client,
 }
 
 impl KefClient {
@@ -27,10 +28,16 @@ impl KefClient {
             .build()
             .expect("failed to create HTTP client");
 
+        let poll_client = Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()
+            .expect("failed to create poll HTTP client");
+
         Self {
             base_url: format!("http://{ip}"),
             ip,
             client,
+            poll_client,
         }
     }
 
