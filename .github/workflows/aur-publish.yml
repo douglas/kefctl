@@ -43,13 +43,14 @@ jobs:
 
       - name: Generate .SRCINFO
         run: |
+          mkdir /tmp/srcinfo-gen
+          cp aur-kefctl/PKGBUILD /tmp/srcinfo-gen/
           docker run --rm \
-            -v "$PWD/aur-kefctl:/pkg" \
+            -v "/tmp/srcinfo-gen:/pkg" \
             archlinux:base-devel \
             bash -c "
-              pacman -Sy --noconfirm git >/dev/null 2>&1
               useradd -m builder >/dev/null 2>&1
-              chown -R builder /pkg
+              chown builder /pkg
               su builder -c 'cd /pkg && makepkg --printsrcinfo'
             " > aur-kefctl/.SRCINFO
 
