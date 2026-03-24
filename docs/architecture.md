@@ -76,13 +76,13 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | `cli.rs` | CLI argument parsing (clap derive) |
 | `config.rs` | TOML config file loader |
 | `discovery.rs` | mDNS speaker discovery via `_kef-info._tcp.local.` |
-| `error.rs` | `KefError` enum (network, API, type mismatch, discovery, config) |
+| `error.rs` | `KefError` enum (network, API, json, type mismatch, discovery, config) |
 
 ### KEF API Client (`kef_api/`)
 
 | Module | Responsibility |
 |--------|---------------|
-| `mod.rs` | `KefClient` struct, `get_data`/`set_data` core methods, `fetch_full_state`, `extract_string`/`extract_i32`/`extract_bool` pure functions |
+| `mod.rs` | `KefClient` struct, `get_data`/`set_data` core methods, `fetch_full_state`, `extract_string`/`extract_i32`/`extract_bool` pure functions, `sanitize()` for network strings |
 | `types.rs` | `ApiValue` tagged union serde, `Source`, `StandbyMode`, `CableMode`, `EqProfile` |
 | `volume.rs` | `get_volume`, `set_volume`, `get_max_volume`, `get_mute`, `set_mute` |
 | `source.rs` | `get_source`, `set_source` |
@@ -136,6 +136,28 @@ All colors flow through `app.theme`. The `Theme::block(title, focused)` helper e
 3. On event: re-fetch full state and update `App`
 4. On timeout: re-poll silently (no error)
 5. On error: notify user, wait 5s, re-subscribe
+
+## Security Model
+
+kefctl communicates over **plaintext HTTP** on the local network — a hardware constraint of the KEF speaker API. The threat model is a hostile device on the same LAN impersonating a speaker.
+
+### Hardening measures
+
+| Concern | Mitigation |
+|---------|-----------|
+| Unsafe Rust | `#![forbid(unsafe_code)]` — compiler-enforced, cannot be overridden |
+| SSRF via redirect | `redirect::Policy::none()` on all reqwest clients |
+| Memory exhaustion | `MAX_RESPONSE_BYTES = 64KB` — bytes checked before deserialization |
+| Terminal injection | `sanitize()` strips control chars (incl. DEL 0x7F) from all API strings and error bodies |
+| mDNS name injection | `sanitize_name()` in `discovery.rs` strips control chars from mDNS names |
+| Symlink attacks | Atomic write (temp+rename) for all state files; no `/tmp` fallback |
+| File disclosure | State/log files: `0o600`; state directories: `0o700` |
+| Supply chain | `cargo-audit` + `cargo-deny` in CI; policy in `deny.toml` |
+
+### Trust boundaries
+
+- **Trusted:** CLI flags, config file (`~/.config/kefctl/config.toml`), local state files
+- **Untrusted:** All data received from the speaker API and mDNS — sanitized before display or storage
 
 ## Dependencies
 

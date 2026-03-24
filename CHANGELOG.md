@@ -2,6 +2,25 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- `#![deny(unsafe_code)]` upgraded to `#![forbid(unsafe_code)]` — cannot be silenced with `#[allow]` on individual items
+- HTTP response bodies now capped at 64KB before deserialization — prevents memory exhaustion from a rogue device on the LAN
+- Error response bodies from the speaker API now sanitized via `sanitize()` before storage in `KefError::Api.message` — closes terminal escape injection path via `eprintln!` / `tracing::warn!`
+- `sanitize()` fast path updated to also filter DEL (0x7F) — was already filtered in slow path via `is_control()`, now consistent
+- State directories created with `DirBuilder::mode(0o700)` instead of relying on umask — prevents other local users from listing directory contents
+- `cargo-audit` and `cargo-deny` added to CI pipeline, run on every push and PR
+- `deny.toml` added: advisories (deny vulnerabilities, warn unmaintained), allowed licenses, source policy (crates.io only)
+
+### Changed
+
+- `get_data()` now reads raw bytes and calls `serde_json::from_slice` (was `resp.json()`) to enable size checking before deserialization
+- `subscribe()` in `events.rs` uses the same bytes-then-deserialize pattern
+- Both reqwest clients gain `pool_max_idle_per_host(1)` — bounded connection pool since only one speaker is addressed
+- `KefError` gains a `Json(#[from] serde_json::Error)` variant for direct serde deserialization errors
+
 ## [0.3.0] — 2026-03-24
 
 ### Added

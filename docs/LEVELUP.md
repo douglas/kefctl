@@ -408,6 +408,9 @@ pub enum KefError {
     #[error("network error: {0}")]           // Display format
     Network(#[from] reqwest::Error),          // auto-converts from reqwest errors
 
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),          // direct serde deserialization errors
+
     #[error("API error (status {status}): {message}")]
     Api { status: u16, message: String },     // structured variant with named fields
 
@@ -556,7 +559,7 @@ kefw2 -s 192.168.50.17 info
 
 ## 11. Testing
 
-kefctl has 95 tests across several categories.
+kefctl has 96 tests across several categories.
 
 ### Test organization
 
@@ -585,7 +588,7 @@ mod tests {
 }
 ```
 
-**In kefctl:** `app.rs` has ~30 tests for keyboard handling and state transitions. `types.rs` has ~20 tests for serde roundtrips. `config.rs` has 9 tests for parsing. `error.rs` has 4 tests for Display formatting.
+**In kefctl:** `app.rs` has ~30 tests for keyboard handling and state transitions. `types.rs` has ~20 tests for serde roundtrips. `config.rs` has 9 tests for parsing. `error.rs` has 4 tests for Display formatting. `kef_api/mod.rs` includes tests for `sanitize()`, including the DEL (0x7F) edge case.
 
 ### UI rendering tests (TestBackend)
 
@@ -640,6 +643,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR:
 2. `cargo test` — all tests including snapshot tests
 3. `cargo doc --no-deps` — verify documentation builds cleanly
 4. `cargo build --release` — verify release build with LTO
+5. `cargo audit` — check dependency tree against the RustSec advisory database
+6. `cargo deny check` — enforce license, source, and vulnerability policy from `deny.toml`
 
 ## 12. Practical Workflow
 
@@ -716,7 +721,7 @@ cargo test
 
 1. Add the variant to `KefError` in `error.rs`
 2. Add `#[error("...")]` format string
-3. If wrapping another error type, add `#[from]` for automatic `?` conversion
+3. If wrapping another error type, add `#[from]` for automatic `?` conversion — see `Json(#[from] serde_json::Error)` as a pattern
 4. Add a Display test in `error.rs` tests
 
 ## 14. Where to Go Next

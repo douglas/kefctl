@@ -95,7 +95,7 @@ See [docs/architecture.md](docs/architecture.md) for the full module map and dat
 ```
 .github/
 └── workflows/
-    ├── ci.yml           # GitHub Actions CI (clippy, test, release build)
+    ├── ci.yml           # GitHub Actions CI (clippy, test, release build, audit, deny)
     └── aur-publish.yml  # Auto-publish to AUR on version tags
 aur/
 └── PKGBUILD             # Arch Linux package definition
@@ -254,7 +254,7 @@ cargo test                 # Run tests (app state, UI rendering, types, API, err
 cargo clippy               # Lint
 ```
 
-GitHub Actions CI runs `clippy --all-targets -- -D warnings`, `cargo test`, and a release build on every push and PR.
+GitHub Actions CI runs `clippy --all-targets -- -D warnings`, `cargo test`, a release build, `cargo audit` for vulnerability scanning, and `cargo deny check` for dependency policy on every push and PR.
 
 ### Testing against a real speaker
 
@@ -306,13 +306,15 @@ kefctl communicates with KEF speakers over **plaintext HTTP** on the local netwo
 **Trust boundary:** Your local network. Do not expose kefctl or the speaker's API port to untrusted networks.
 
 **Hardening measures:**
-- `#![deny(unsafe_code)]` — no unsafe Rust
+- `#![forbid(unsafe_code)]` — no unsafe Rust, cannot be overridden per-item
 - HTTP redirects disabled — prevents SSRF via spoofed speakers
-- Network-sourced strings (speaker names, mDNS data) are sanitized to strip control characters
+- HTTP response bodies capped at 64KB before deserialization — guards against memory exhaustion from a rogue device
+- Network-sourced strings (speaker names, API data, mDNS names, error bodies) sanitized to strip control characters including DEL (0x7F)
 - State files use atomic writes (write-then-rename) to prevent symlink attacks
-- State and log files are created with `0o600` permissions
-- Cached IPs are validated on load as `IpAddr`
+- State and log files created with `0o600` permissions; state directories with `0o700`
+- Cached IPs validated on load as `IpAddr`
 - Waybar JSON output uses `serde_json` for proper escaping
+- Supply chain: `cargo-audit` and `cargo-deny` run in CI on every push; policy defined in `deny.toml`
 
 ## Changelog
 
