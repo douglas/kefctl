@@ -1,0 +1,63 @@
+name: Publish to AUR
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  aur-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Compute sha256 of release tarball
+        run: |
+          curl -fsSL "https://github.com/douglas/kefctl/archive/${GITHUB_REF_NAME}.tar.gz" \
+            -o tarball.tar.gz
+          echo "SHA256=$(sha256sum tarball.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Configure AUR SSH
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AUR_SSH_KEY" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          ssh-keyscan -t rsa aur.archlinux.org >> ~/.ssh/known_hosts
+          printf 'Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur_key\n  User aur\n  StrictHostKeyChecking yes\n' \
+            >> ~/.ssh/config
+
+      - name: Clone AUR repository
+        run: git clone ssh://aur@aur.archlinux.org/kefctl.git aur-kefctl
+
+      - name: Update PKGBUILD
+        run: |
+          cp aur/PKGBUILD aur-kefctl/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" aur-kefctl/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" aur-kefctl/PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${SHA256}')/" aur-kefctl/PKGBUILD
+
+      - name: Generate .SRCINFO
+        run: |
+          docker run --rm \
+            -v "$PWD/aur-kefctl:/pkg" \
+            archlinux:base-devel \
+            bash -c "
+              pacman -Sy --noconfirm git >/dev/null 2>&1
+              useradd -m builder >/dev/null 2>&1
+              chown -R builder /pkg
+              su builder -c 'cd /pkg && makepkg --printsrcinfo'
+            " > aur-kefctl/.SRCINFO
+
+      - name: Commit and push to AUR
+        run: |
+          cd aur-kefctl
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add PKGBUILD .SRCINFO
+          git diff --cached --quiet || git commit -m "Update to ${GITHUB_REF_NAME}"
+          git push
