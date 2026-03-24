@@ -1,7 +1,7 @@
 //! TOML config file loading from `~/.config/kefctl/config.toml`.
 
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::error::KefError;
 
@@ -54,27 +54,76 @@ impl Config {
     }
 }
 
-/// Returns the path to the cached speaker IP file.
-/// Uses XDG state dir: `~/.local/state/kefctl/last_speaker`
-fn cache_path() -> PathBuf {
+/// Returns the XDG state directory for kefctl, or None if unavailable.
+/// Never falls back to `/tmp` — world-writable dirs are a symlink attack vector.
+fn state_dir() -> Option<PathBuf> {
     dirs::state_dir()
         .or_else(dirs::data_local_dir)
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("kefctl")
-        .join("last_speaker")
+        .map(|d| d.join("kefctl"))
+}
+
+/// Returns the path to the cached speaker IP file.
+/// Uses XDG state dir: `~/.local/state/kefctl/last_speaker`
+fn cache_path() -> Option<PathBuf> {
+    state_dir().map(|d| d.join("last_speaker"))
+}
+
+/// Write a file atomically: write to a temp file then rename.
+/// Prevents symlink attacks and partial writes.
+fn atomic_write(path: &Path, contents: &str) {
+    let Some(parent) = path.parent() else { return };
+    if let Err(e) = std::fs::create_dir_all(parent) {
+        tracing::warn!("Failed to create dir {}: {e}", parent.display());
+        return;
+    }
+    let tmp = parent.join(format!(
+        ".{}.tmp",
+        path.file_name().unwrap_or_default().to_string_lossy()
+    ));
+    let result = std::fs::write(&tmp, contents)
+        .and_then(|()| {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(
+                    &tmp,
+                    std::fs::Permissions::from_mode(0o600),
+                );
+            }
+            std::fs::rename(&tmp, path)
+        });
+    if let Err(e) = result {
+        tracing::warn!("Failed to write {}: {e}", path.display());
+        let _ = std::fs::remove_file(&tmp);
+    }
 }
 
 /// Load the cached speaker IP from the state file.
-pub(crate) fn load_cached_ip() -> Option<String> {
-    let path = cache_path();
+/// Returns a validated `IpAddr` — rejects malformed content.
+pub(crate) fn load_cached_ip() -> Option<std::net::IpAddr> {
+    let path = cache_path()?;
     match std::fs::read_to_string(&path) {
         Ok(contents) => {
-            let ip = contents.trim().to_string();
-            if ip.is_empty() { None } else { Some(ip) }
+            let trimmed = contents.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            if let Ok(ip) = trimmed.parse() {
+                Some(ip)
+            } else {
+                tracing::warn!(
+                    "Invalid cached IP in {}: {trimmed}",
+                    path.display()
+                );
+                None
+            }
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
-            tracing::warn!("Failed to read cached speaker IP from {}: {e}", path.display());
+            tracing::warn!(
+                "Failed to read cached speaker IP from {}: {e}",
+                path.display()
+            );
             None
         }
     }
@@ -82,17 +131,13 @@ pub(crate) fn load_cached_ip() -> Option<String> {
 
 /// Returns the path to the cached last-used source file.
 /// Uses XDG state dir: `~/.local/state/kefctl/last_source`
-fn source_cache_path() -> PathBuf {
-    dirs::state_dir()
-        .or_else(dirs::data_local_dir)
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("kefctl")
-        .join("last_source")
+fn source_cache_path() -> Option<PathBuf> {
+    state_dir().map(|d| d.join("last_source"))
 }
 
 /// Load the last-used source from the state file.
 pub(crate) fn load_last_source() -> Option<String> {
-    let path = source_cache_path();
+    let path = source_cache_path()?;
     match std::fs::read_to_string(&path) {
         Ok(contents) => {
             let source = contents.trim().to_string();
@@ -111,36 +156,20 @@ pub(crate) fn load_last_source() -> Option<String> {
 
 /// Save the last-used source to the state file.
 pub(crate) fn save_last_source(source: &str) {
-    let path = source_cache_path();
-    if let Some(parent) = path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            tracing::warn!(
-                "Failed to create cache dir {}: {e}",
-                parent.display()
-            );
-            return;
-        }
-    }
-    if let Err(e) = std::fs::write(&path, source) {
-        tracing::warn!(
-            "Failed to save last source to {}: {e}",
-            path.display()
-        );
-    }
+    let Some(path) = source_cache_path() else {
+        tracing::warn!("No XDG state dir available, skipping last source save");
+        return;
+    };
+    atomic_write(&path, source);
 }
 
 /// Save a speaker IP to the state file for next launch.
 pub(crate) fn save_cached_ip(ip: &std::net::IpAddr) {
-    let path = cache_path();
-    if let Some(parent) = path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            tracing::warn!("Failed to create cache dir {}: {e}", parent.display());
-            return;
-        }
-    }
-    if let Err(e) = std::fs::write(&path, ip.to_string()) {
-        tracing::warn!("Failed to save cached speaker IP to {}: {e}", path.display());
-    }
+    let Some(path) = cache_path() else {
+        tracing::warn!("No XDG state dir available, skipping IP cache save");
+        return;
+    };
+    atomic_write(&path, &ip.to_string());
 }
 
 #[cfg(test)]

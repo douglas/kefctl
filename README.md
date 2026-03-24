@@ -286,6 +286,21 @@ Values use a tagged union format: `{"type": "i32_", "i32_": 50}`.
 
 Logs are written to `~/.local/state/kefctl/kefctl.log` (no terminal output to keep TUI clean).
 
+## Security
+
+kefctl communicates with KEF speakers over **plaintext HTTP** on the local network. This is a hardware limitation — the speakers do not support HTTPS. All commands and status data are visible to anyone on the same LAN.
+
+**Trust boundary:** Your local network. Do not expose kefctl or the speaker's API port to untrusted networks.
+
+**Hardening measures:**
+- `#![deny(unsafe_code)]` — no unsafe Rust
+- HTTP redirects disabled — prevents SSRF via spoofed speakers
+- Network-sourced strings (speaker names, mDNS data) are sanitized to strip control characters
+- State files use atomic writes (write-then-rename) to prevent symlink attacks
+- State and log files are created with `0o600` permissions
+- Cached IPs are validated on load as `IpAddr`
+- Waybar JSON output uses `serde_json` for proper escaping
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.

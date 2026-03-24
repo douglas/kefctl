@@ -11,6 +11,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use reqwest::Client;
+use reqwest::redirect;
 
 use crate::app::SpeakerState;
 use crate::error::KefError;
@@ -28,12 +29,14 @@ impl KefClient {
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(5))
+            .redirect(redirect::Policy::none())
             .build()
             .expect("failed to create HTTP client");
 
         let poll_client = Client::builder()
             .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(60))
+            .redirect(redirect::Policy::none())
             .build()
             .expect("failed to create poll HTTP client");
 
@@ -134,10 +137,20 @@ impl KefClient {
     }
 }
 
+/// Strip control characters from untrusted network strings to prevent
+/// terminal escape injection when printed via `println!()`.
+fn sanitize(s: String) -> String {
+    if s.bytes().all(|b| b >= 0x20 || b == b'\n') {
+        s
+    } else {
+        s.chars().filter(|c| !c.is_control() || *c == '\n').collect()
+    }
+}
+
 // Pure extraction functions — testable without HTTP
 fn extract_string(data: GetDataResponse) -> Result<String, KefError> {
     match data.into_iter().next() {
-        Some(ApiValue::String { value }) => Ok(value),
+        Some(ApiValue::String { value }) => Ok(sanitize(value)),
         Some(other) => Err(KefError::TypeMismatch {
             expected: "string",
             got: format!("{other:?}"),
@@ -240,6 +253,18 @@ mod tests {
         // API returns array — we only use the first element
         let data = vec![ApiValue::i32(10), ApiValue::i32(20)];
         assert_eq!(extract_i32(data).unwrap(), 10);
+    }
+
+    #[test]
+    fn sanitize_strips_control_chars() {
+        assert_eq!(sanitize("hello".to_string()), "hello");
+        // ESC (0x1b) is stripped, printable chars remain
+        assert_eq!(sanitize("he\x1b[31mllo".to_string()), "he[31mllo");
+        assert_eq!(sanitize("\x00\x01\x02clean".to_string()), "clean");
+        // Newlines are preserved
+        assert_eq!(sanitize("line1\nline2".to_string()), "line1\nline2");
+        // Pure ASCII passthrough (fast path)
+        assert_eq!(sanitize("KEF LSX II".to_string()), "KEF LSX II");
     }
 
     #[test]

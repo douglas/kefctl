@@ -8,6 +8,12 @@ use mdns_sd::{ServiceDaemon, ServiceEvent};
 use crate::app::DiscoveredSpeaker;
 use crate::error::KefError;
 
+/// Strip control characters from mDNS-sourced names to prevent terminal
+/// escape injection when printed via `println!()`.
+fn sanitize_name(s: &str) -> String {
+    s.chars().filter(|c| !c.is_control()).collect()
+}
+
 pub(crate) async fn discover_speakers(
     timeout: Duration,
 ) -> Result<Vec<DiscoveredSpeaker>, KefError> {
@@ -35,11 +41,11 @@ pub(crate) async fn discover_speakers(
             Ok(Ok(Ok(ServiceEvent::ServiceResolved(info)))) => {
                 let name = info.get_fullname().to_string();
                 for addr in info.get_addresses_v4() {
+                    let raw_name = info
+                        .get_property_val_str("fn")
+                        .unwrap_or(&name);
                     speakers.push(DiscoveredSpeaker {
-                        name: info
-                            .get_property_val_str("fn")
-                            .unwrap_or(&name)
-                            .to_string(),
+                        name: sanitize_name(raw_name),
                         ip: IpAddr::V4(addr),
                         port: info.get_port(),
                     });

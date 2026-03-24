@@ -204,8 +204,7 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
 /// Try the cached speaker IP — quick probe to see if the speaker is still there.
 /// Uses a short 2-second timeout so fallback to discovery is fast.
 async fn try_cached_ip() -> Option<IpAddr> {
-    let cached = config::load_cached_ip()?;
-    let ip: IpAddr = cached.parse().ok()?;
+    let ip = config::load_cached_ip()?;
     eprintln!("Trying cached speaker {ip}...");
 
     // Quick probe with short timeout — don't make the user wait
@@ -258,18 +257,23 @@ fn dispatch_action(
 
 fn init_logging() {
     // Log to file so stdout stays clean for TUI
-    let state_dir = dirs::state_dir()
+    let Some(state_dir) = dirs::state_dir()
         .or_else(dirs::data_local_dir)
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-        .join("kefctl");
+        .map(|d| d.join("kefctl"))
+    else {
+        return;
+    };
     let _ = std::fs::create_dir_all(&state_dir);
     let log_path = state_dir.join("kefctl.log");
 
-    if let Ok(file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
+    let mut opts = std::fs::OpenOptions::new();
+    opts.create(true).append(true);
+    #[cfg(unix)]
     {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    if let Ok(file) = opts.open(&log_path) {
         use tracing_subscriber::prelude::*;
         use tracing_subscriber::{EnvFilter, fmt};
 
@@ -311,7 +315,7 @@ fn require_speaker(ip: Option<&str>) -> String {
     }
     if let Some(cached) = config::load_cached_ip() {
         eprintln!("Using cached speaker {cached} (use --speaker to override)");
-        return cached;
+        return cached.to_string();
     }
     eprintln!(
         "No speaker specified. Use --speaker <ip>, \
@@ -521,9 +525,13 @@ async fn cmd_waybar(speaker_ip: Option<&str>) {
 }
 
 fn print_waybar_json(text: &str, tooltip: &str, class: &str) {
-    println!(
-        r#"{{"text":"{text}","tooltip":"{tooltip}","class":"{class}","alt":"{class}"}}"#
-    );
+    let obj = serde_json::json!({
+        "text": text,
+        "tooltip": tooltip,
+        "class": class,
+        "alt": class,
+    });
+    println!("{obj}");
 }
 
 fn resolve_waybar_ip(speaker_ip: Option<&str>) -> Option<IpAddr> {
@@ -535,5 +543,5 @@ fn resolve_waybar_ip(speaker_ip: Option<&str>) -> Option<IpAddr> {
             return ip.parse().ok();
         }
     }
-    config::load_cached_ip()?.parse().ok()
+    config::load_cached_ip()
 }
