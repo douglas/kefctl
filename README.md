@@ -9,6 +9,10 @@ Keyboard-driven terminal interface that talks to KEF speakers over their HTTP JS
 ## Install
 
 ```sh
+# Arch Linux (AUR)
+yay -S kefctl
+
+# From source
 cargo install --path .
 ```
 
@@ -34,8 +38,13 @@ kefctl --demo
 # CLI commands (scriptable)
 kefctl discover              # Find speakers on the network
 kefctl status                # Print speaker status
+kefctl source                # Show current source
 kefctl source wifi           # Switch source
+kefctl volume                # Show current volume
 kefctl volume 30             # Set volume
+kefctl mute                  # Toggle mute
+kefctl mute on               # Mute
+kefctl mute off              # Unmute
 kefctl toggle                # Wake or standby the speaker
 kefctl waybar                # JSON status for waybar module
 ```
@@ -86,7 +95,10 @@ See [docs/architecture.md](docs/architecture.md) for the full module map and dat
 ```
 .github/
 └── workflows/
-    └── ci.yml       # GitHub Actions CI (clippy, test, release build)
+    ├── ci.yml           # GitHub Actions CI (clippy, test, release build)
+    └── aur-publish.yml  # Auto-publish to AUR on version tags
+aur/
+└── PKGBUILD             # Arch Linux package definition
 src/
 ├── main.rs          # CLI parsing, TUI loop, action dispatch
 ├── app.rs           # App state, keyboard handling, Panel/Focus enums
@@ -124,6 +136,7 @@ Optional config at `~/.config/kefctl/config.toml`:
 [speaker]
 ip = "192.168.50.17"
 name = "Living Room"
+default_source = "usb"   # fallback for toggle (usb, wifi, bluetooth, tv, optical, coaxial, analog)
 
 [ui]
 refresh_ms = 1000
@@ -228,7 +241,7 @@ Add to `~/.config/waybar/style.css`:
 
 ### Prerequisites
 
-- Rust 1.85+ (uses edition 2024)
+- Rust 1.86+ (uses edition 2024)
 - A KEF W2-platform speaker on the network (or use `--demo`)
 
 ### Quick start

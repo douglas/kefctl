@@ -126,7 +126,7 @@ match volume {
 let volume = client.get_volume().await?;  // returns Err early if it fails
 ```
 
-**In kefctl:** `Option` is used for track/artist/duration (might not be playing). `Result` + `?` is used for all API calls. `KefError` in `error.rs` is the error type.
+**In kefctl:** `Option` is used for optional values (e.g., `default_source` in config, which may not be set). `Result` + `?` is used for all API calls. `KefError` in `error.rs` is the error type.
 
 ### Ownership (the one new concept)
 
@@ -365,7 +365,7 @@ struct Cli {
     demo: bool,                  // --demo
 
     #[command(subcommand)]
-    command: Option<Commands>,   // discover, status, source, volume
+    command: Option<Commands>,   // discover, status, source, volume, mute, toggle, waybar
 }
 ```
 
@@ -556,7 +556,7 @@ kefw2 -s 192.168.50.17 info
 
 ## 11. Testing
 
-kefctl has 99 tests across several categories.
+kefctl has 95 tests across several categories.
 
 ### Test organization
 
@@ -637,7 +637,7 @@ cargo insta accept             # accept all pending changes
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR:
 
 1. `cargo clippy --all-targets -- -D warnings` — lint with warnings as errors
-2. `cargo test` — all 99 tests including snapshot tests
+2. `cargo test` — all tests including snapshot tests
 3. `cargo doc --no-deps` — verify documentation builds cleanly
 4. `cargo build --release` — verify release build with LTO
 

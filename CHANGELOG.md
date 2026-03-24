@@ -2,6 +2,46 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `kefctl toggle` — wake speaker to last-used source or send to standby
+- `kefctl waybar` — JSON status output for waybar custom module
+- `kefctl mute [on|off]` — scriptable mute control; omit argument to toggle
+- Last-used source persistence (`~/.local/state/kefctl/last_source`)
+- `default_source` config option as fallback for `kefctl toggle`
+- Auto-detect speaker model from firmware string (LSX II, LS50 Wireless II, LS60 Wireless)
+- Event subscriptions for standby mode, max volume, and EQ profile (8 paths total, was 5)
+- Real EQ/DSP data from `kef:eqProfile/v2` API endpoint (22 fields)
+- `unwrap_or_exit()` helper in main.rs to eliminate duplicate error-exit boilerplate
+- AUR auto-publish workflow (`.github/workflows/aur-publish.yml`) — triggered on `v*` tags
+- `aur/PKGBUILD` as authoritative AUR package source in this repo
+
+### Changed
+
+- EQ/DSP panel shows real speaker data (was hardcoded defaults)
+- Settings panel: cable mode moved to display-only info section
+- `load_cached_ip()` validates and returns `IpAddr` directly (was `Option<String>`)
+- Cargo.toml and PKGBUILD description updated to mention all W2 models
+
+### Removed
+
+- `SetCableMode` action (was a no-op)
+- EQ value adjustment handlers (panel is read-only until write API is implemented)
+- `SubPolarity` enum, `BassExtension` cycling methods (unused)
+- `/tmp` fallback for state/log directories — skip and warn instead
+
+### Security
+
+- JSON injection fix: waybar output uses `serde_json::json!()` instead of string interpolation
+- HTTP redirects disabled (`redirect::Policy::none()`) on both reqwest clients (SSRF prevention)
+- Network-sourced strings sanitized: control characters stripped from API strings and mDNS names
+- State files use atomic writes (write-then-rename) with 0o600 permissions
+- Log file opened with mode 0o600
+- Cached IPs validated as `IpAddr` on load
+- Updated rustls-webpki to resolve RUSTSEC-2026-0049
+
 ## [0.2.0] — 2026-03-20
 
 ### Changed
