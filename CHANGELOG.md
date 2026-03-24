@@ -2,7 +2,7 @@
 
 All notable changes to kefctl will be documented in this file.
 
-## [Unreleased]
+## [0.4.0] — 2026-03-24
 
 ### Security
 
