@@ -1,5 +1,5 @@
 //! kefctl — TUI controller for KEF W2-platform speakers.
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
 
 mod app;
@@ -266,6 +266,12 @@ fn init_logging() {
     else {
         return;
     };
+    #[cfg(unix)]
+    let _ = {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&state_dir)
+    };
+    #[cfg(not(unix))]
     let _ = std::fs::create_dir_all(&state_dir);
     let log_path = state_dir.join("kefctl.log");
 

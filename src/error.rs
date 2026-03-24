@@ -7,6 +7,9 @@ pub enum KefError {
     #[error("network error: {0}")]
     Network(#[from] reqwest::Error),
 
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
+
     #[error("API error (status {status}): {message}")]
     Api { status: u16, message: String },
 

@@ -72,7 +72,14 @@ fn cache_path() -> Option<PathBuf> {
 /// Prevents symlink attacks and partial writes.
 fn atomic_write(path: &Path, contents: &str) {
     let Some(parent) = path.parent() else { return };
-    if let Err(e) = std::fs::create_dir_all(parent) {
+    #[cfg(unix)]
+    let create_result = {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().recursive(true).mode(0o700).create(parent)
+    };
+    #[cfg(not(unix))]
+    let create_result = std::fs::create_dir_all(parent);
+    if let Err(e) = create_result {
         tracing::warn!("Failed to create dir {}: {e}", parent.display());
         return;
     }

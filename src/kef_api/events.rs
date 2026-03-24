@@ -18,12 +18,19 @@ impl KefClient {
         if !resp.status().is_success() {
             return Err(KefError::Api {
                 status: resp.status().as_u16(),
-                message: resp.text().await.unwrap_or_default(),
+                message: super::sanitize(resp.text().await.unwrap_or_default()),
             });
         }
 
         // API returns a plain JSON string like "{uuid}" — strip braces
-        let queue_id: String = resp.json().await?;
+        let bytes = resp.bytes().await?;
+        if bytes.len() > super::MAX_RESPONSE_BYTES {
+            return Err(KefError::Api {
+                status: 0,
+                message: "response body too large".into(),
+            });
+        }
+        let queue_id: String = serde_json::from_slice(&bytes)?;
         Ok(queue_id.trim_matches(|c| c == '{' || c == '}').to_string())
     }
 
@@ -53,12 +60,16 @@ impl KefClient {
         if !resp.status().is_success() {
             return Err(KefError::Api {
                 status: resp.status().as_u16(),
-                message: resp.text().await.unwrap_or_default(),
+                message: super::sanitize(resp.text().await.unwrap_or_default()),
             });
         }
 
         let body = resp.text().await.unwrap_or_default();
         if body.is_empty() || body == "[]" {
+            return Ok(None);
+        }
+        if body.len() > super::MAX_RESPONSE_BYTES {
+            tracing::warn!("poll response too large ({} bytes), ignoring", body.len());
             return Ok(None);
         }
 

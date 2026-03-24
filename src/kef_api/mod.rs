@@ -13,6 +13,10 @@ use std::time::Duration;
 use reqwest::Client;
 use reqwest::redirect;
 
+/// Maximum bytes accepted from a speaker HTTP response.
+/// Guards against memory exhaustion from a spoofed device on the LAN.
+const MAX_RESPONSE_BYTES: usize = 64 * 1024;
+
 use crate::app::SpeakerState;
 use crate::error::KefError;
 use types::{ApiValue, EqProfile, GetDataResponse, SetDataRequest};
@@ -30,6 +34,7 @@ impl KefClient {
             .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(5))
             .redirect(redirect::Policy::none())
+            .pool_max_idle_per_host(1)
             .build()
             .expect("failed to create HTTP client");
 
@@ -37,6 +42,7 @@ impl KefClient {
             .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(60))
             .redirect(redirect::Policy::none())
+            .pool_max_idle_per_host(1)
             .build()
             .expect("failed to create poll HTTP client");
 
@@ -61,11 +67,18 @@ impl KefClient {
         if !resp.status().is_success() {
             return Err(KefError::Api {
                 status: resp.status().as_u16(),
-                message: resp.text().await.unwrap_or_default(),
+                message: sanitize(resp.text().await.unwrap_or_default()),
             });
         }
 
-        Ok(resp.json().await?)
+        let bytes = resp.bytes().await?;
+        if bytes.len() > MAX_RESPONSE_BYTES {
+            return Err(KefError::Api {
+                status: 0,
+                message: "response body too large".into(),
+            });
+        }
+        Ok(serde_json::from_slice(&bytes)?)
     }
 
     #[tracing::instrument(skip(self, value), fields(path))]
@@ -77,7 +90,7 @@ impl KefClient {
         if !resp.status().is_success() {
             return Err(KefError::Api {
                 status: resp.status().as_u16(),
-                message: resp.text().await.unwrap_or_default(),
+                message: sanitize(resp.text().await.unwrap_or_default()),
             });
         }
 
@@ -159,10 +172,10 @@ fn detect_model(firmware: &str) -> String {
     .to_string()
 }
 
-/// Strip control characters from untrusted network strings to prevent
-/// terminal escape injection when printed via `println!()`.
+/// Strip control characters (including DEL 0x7F) from untrusted network strings
+/// to prevent terminal escape injection when printed via `println!()`.
 fn sanitize(s: String) -> String {
-    if s.bytes().all(|b| b >= 0x20 || b == b'\n') {
+    if s.bytes().all(|b| (b >= 0x20 && b != 0x7f) || b == b'\n') {
         s
     } else {
         s.chars().filter(|c| !c.is_control() || *c == '\n').collect()
@@ -287,6 +300,14 @@ mod tests {
         assert_eq!(sanitize("line1\nline2".to_string()), "line1\nline2");
         // Pure ASCII passthrough (fast path)
         assert_eq!(sanitize("KEF LSX II".to_string()), "KEF LSX II");
+    }
+
+    #[test]
+    fn sanitize_strips_del() {
+        // DEL (0x7F) is a control character and must be filtered by both code paths
+        assert_eq!(sanitize("ab\x7fcd".to_string()), "abcd");
+        // Fast path: all chars otherwise printable
+        assert_eq!(sanitize("clean\x7f".to_string()), "clean");
     }
 
     #[test]
