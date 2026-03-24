@@ -36,6 +36,8 @@ kefctl discover              # Find speakers on the network
 kefctl status                # Print speaker status
 kefctl source wifi           # Switch source
 kefctl volume 30             # Set volume
+kefctl toggle                # Wake or standby the speaker
+kefctl waybar                # JSON status for waybar module
 ```
 
 ## TUI Keybindings
@@ -171,6 +173,56 @@ chmod +x ~/.config/omarchy/hooks/theme-set.d/kefctl
 | `color2` | OK/connected status |
 | `color3` | Warnings, keybinding labels |
 | `color8` | Dim text, unfocused borders, badge backgrounds |
+
+## Waybar Integration
+
+kefctl can drive a waybar custom module for one-click speaker control.
+
+### CLI commands
+
+```sh
+kefctl toggle    # Wake speaker to last-used source, or send to standby
+kefctl waybar    # Output JSON status for waybar custom module
+```
+
+`toggle` remembers the last-used source (persisted to `~/.local/state/kefctl/last_source`). On first use or when no source is saved, it falls back to the `default_source` config option, then USB.
+
+```toml
+# ~/.config/kefctl/config.toml
+[speaker]
+default_source = "usb"   # fallback for toggle (usb, wifi, bluetooth, tv, optical, coaxial, analog)
+```
+
+### Waybar config
+
+Add to `~/.config/waybar/config`:
+
+```json
+"custom/kef": {
+    "exec": "kefctl waybar",
+    "return-type": "json",
+    "interval": 30,
+    "signal": 8,
+    "on-click": "kefctl toggle && pkill -RTMIN+8 waybar",
+    "on-click-right": "sh -c 'if command -v ghostty >/dev/null 2>&1; then ghostty -e kefctl; else alacritty -e kefctl; fi' &",
+    "format": "{icon}",
+    "format-icons": {
+        "on": "󰓃",
+        "off": "󰓄"
+    }
+}
+```
+
+Add to `~/.config/waybar/style.css`:
+
+```css
+#custom-kef.on { color: @accent; }
+#custom-kef.off { color: @foreground; opacity: 0.5; }
+```
+
+- Left-click toggles the speaker on/off with instant icon refresh via `SIGRTMIN+8`
+- Right-click opens the full TUI in ghostty (alacritty fallback)
+- Background poll every 30 seconds for passive status updates
 
 ## Development
 

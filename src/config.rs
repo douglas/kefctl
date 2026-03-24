@@ -17,6 +17,7 @@ pub(crate) struct Config {
 pub(crate) struct SpeakerConfig {
     pub(crate) ip: Option<String>,
     pub(crate) name: Option<String>,
+    pub(crate) default_source: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -76,6 +77,55 @@ pub(crate) fn load_cached_ip() -> Option<String> {
             tracing::warn!("Failed to read cached speaker IP from {}: {e}", path.display());
             None
         }
+    }
+}
+
+/// Returns the path to the cached last-used source file.
+/// Uses XDG state dir: `~/.local/state/kefctl/last_source`
+fn source_cache_path() -> PathBuf {
+    dirs::state_dir()
+        .or_else(dirs::data_local_dir)
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("kefctl")
+        .join("last_source")
+}
+
+/// Load the last-used source from the state file.
+pub(crate) fn load_last_source() -> Option<String> {
+    let path = source_cache_path();
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => {
+            let source = contents.trim().to_string();
+            if source.is_empty() { None } else { Some(source) }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            tracing::warn!(
+                "Failed to read last source from {}: {e}",
+                path.display()
+            );
+            None
+        }
+    }
+}
+
+/// Save the last-used source to the state file.
+pub(crate) fn save_last_source(source: &str) {
+    let path = source_cache_path();
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!(
+                "Failed to create cache dir {}: {e}",
+                parent.display()
+            );
+            return;
+        }
+    }
+    if let Err(e) = std::fs::write(&path, source) {
+        tracing::warn!(
+            "Failed to save last source to {}: {e}",
+            path.display()
+        );
     }
 }
 
@@ -215,6 +265,48 @@ mod tests {
         // Test the logic directly
         let result = std::fs::read_to_string("/nonexistent/path/last_speaker");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn config_with_default_source() {
+        let toml = r#"
+            [speaker]
+            ip = "192.168.1.100"
+            default_source = "usb"
+        "#;
+        let config = Config::load_from_str(toml).unwrap();
+        assert_eq!(config.speaker.default_source.as_deref(), Some("usb"));
+    }
+
+    #[test]
+    fn config_without_default_source() {
+        let toml = r#"
+            [speaker]
+            ip = "192.168.1.100"
+        "#;
+        let config = Config::load_from_str(toml).unwrap();
+        assert_eq!(config.speaker.default_source, None);
+    }
+
+    #[test]
+    fn save_and_load_last_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("last_source");
+
+        std::fs::write(&path, "usb").unwrap();
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(contents.trim(), "usb");
+    }
+
+    #[test]
+    fn load_last_source_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("last_source");
+        std::fs::write(&path, "").unwrap();
+
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let source = contents.trim().to_string();
+        assert!(source.is_empty());
     }
 
     #[test]

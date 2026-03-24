@@ -40,6 +40,35 @@ impl Source {
             Source::Standby => "Standby",
         }
     }
+
+    /// Returns the serde/camelCase name used in the KEF API and state files.
+    pub fn serde_name(self) -> &'static str {
+        match self {
+            Source::Usb => "usb",
+            Source::Wifi => "wifi",
+            Source::Bluetooth => "bluetooth",
+            Source::Tv => "tv",
+            Source::Optical => "optical",
+            Source::Coaxial => "coaxial",
+            Source::Analog => "analog",
+            Source::Standby => "standby",
+        }
+    }
+
+    /// Parse a serde/camelCase name back to a `Source`.
+    pub fn from_serde_name(s: &str) -> Option<Source> {
+        match s {
+            "usb" => Some(Source::Usb),
+            "wifi" => Some(Source::Wifi),
+            "bluetooth" => Some(Source::Bluetooth),
+            "tv" => Some(Source::Tv),
+            "optical" => Some(Source::Optical),
+            "coaxial" => Some(Source::Coaxial),
+            "analog" => Some(Source::Analog),
+            "standby" => Some(Source::Standby),
+            _ => None,
+        }
+    }
 }
 
 // ---------- Cable Mode ----------
@@ -559,6 +588,21 @@ mod tests {
         let json = r#"{"type":"i32_"}"#;
         let result = serde_json::from_str::<ApiValue>(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn source_serde_name_roundtrip() {
+        for &source in Source::ALL {
+            let name = source.serde_name();
+            assert_eq!(
+                Source::from_serde_name(name),
+                Some(source),
+                "roundtrip failed for {name}"
+            );
+        }
+        assert_eq!(Source::from_serde_name("standby"), Some(Source::Standby));
+        assert_eq!(Source::from_serde_name("unknown"), None);
+        assert_eq!(Source::from_serde_name(""), None);
     }
 
     #[test]

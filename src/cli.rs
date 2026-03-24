@@ -38,6 +38,12 @@ pub enum Commands {
         /// Volume level (0-100)
         level: Option<i32>,
     },
+
+    /// Toggle speaker on/off (wake to last source or send to standby)
+    Toggle,
+
+    /// Output JSON status for waybar custom module
+    Waybar,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

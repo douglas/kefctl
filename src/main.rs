@@ -61,6 +61,13 @@ async fn main() {
             let ip = resolve_speaker(speaker_ip);
             cmd_get_volume(ip).await;
         }
+        Some(Commands::Toggle) => {
+            let ip = resolve_speaker(speaker_ip);
+            cmd_toggle(ip, &config).await;
+        }
+        Some(Commands::Waybar) => {
+            cmd_waybar(speaker_ip).await;
+        }
         None => {
             if cli.demo {
                 run_tui_demo(config).await;
@@ -225,7 +232,10 @@ fn dispatch_action(
         let result = match action {
             Action::SetVolume(v) => client.set_volume(v).await,
             Action::ToggleMute(m) => client.set_mute(m).await,
-            Action::SetSource(s) => client.set_source(s).await,
+            Action::SetSource(s) => {
+                config::save_last_source(s.serde_name());
+                client.set_source(s).await
+            }
             Action::SetCableMode => Ok(()), // Cable mode is read-only in practice
             Action::SetStandbyMode(m) => client.set_standby_mode(m).await,
             Action::SetMaxVolume(v) => {
@@ -376,7 +386,10 @@ async fn cmd_set_source(ip: IpAddr, source_arg: SourceArg) {
 
     let client = KefClient::new(ip);
     match client.set_source(source).await {
-        Ok(()) => println!("Source set to {}", source.display_name()),
+        Ok(()) => {
+            config::save_last_source(source.serde_name());
+            println!("Source set to {}", source.display_name());
+        }
         Err(e) => {
             eprintln!("Error: {e}");
             std::process::exit(1);
@@ -409,4 +422,118 @@ async fn cmd_set_volume(ip: IpAddr, level: i32) {
             std::process::exit(1);
         }
     }
+}
+
+/// Resolve which source to wake the speaker to.
+/// Priority: last-used source > config `default_source` > USB.
+fn resolve_wake_source(config: &Config) -> Source {
+    if let Some(name) = config::load_last_source() {
+        if let Some(source) = Source::from_serde_name(&name) {
+            if source != Source::Standby {
+                return source;
+            }
+        }
+    }
+    if let Some(ref name) = config.speaker.default_source {
+        if let Some(source) = Source::from_serde_name(name) {
+            if source == Source::Standby {
+                tracing::warn!("default_source cannot be 'standby', using USB");
+            } else {
+                return source;
+            }
+        } else {
+            tracing::warn!("Unknown default_source '{name}', using USB");
+        }
+    }
+    Source::Usb
+}
+
+async fn cmd_toggle(ip: IpAddr, config: &Config) {
+    let client = KefClient::new(ip);
+    let current = match client.get_source().await {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    if current == Source::Standby {
+        let wake = resolve_wake_source(config);
+        match client.set_source(wake).await {
+            Ok(()) => {
+                config::save_last_source(wake.serde_name());
+                println!("Waking speaker to {}", wake.display_name());
+            }
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        config::save_last_source(current.serde_name());
+        match client.set_source(Source::Standby).await {
+            Ok(()) => println!("Speaker entering standby"),
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
+}
+
+async fn cmd_waybar(speaker_ip: Option<&str>) {
+    let Some(ip) = resolve_waybar_ip(speaker_ip) else {
+        print_waybar_json("\u{f04c4}", "KEF \u{00b7} Offline", "off");
+        return;
+    };
+
+    let kef = KefClient::new(ip);
+
+    match kef.get_source().await {
+        Ok(Source::Standby) => {
+            print_waybar_json("\u{f04c4}", "KEF \u{00b7} Standby", "off");
+        }
+        Ok(source) => {
+            let tooltip = match (kef.get_volume().await, kef.get_mute().await) {
+                (Ok(vol), Ok(true)) => {
+                    format!(
+                        "KEF \u{00b7} {} \u{00b7} {}% [MUTED]",
+                        source.display_name(),
+                        vol
+                    )
+                }
+                (Ok(vol), _) => {
+                    format!(
+                        "KEF \u{00b7} {} \u{00b7} {}%",
+                        source.display_name(),
+                        vol
+                    )
+                }
+                _ => format!("KEF \u{00b7} {}", source.display_name()),
+            };
+            print_waybar_json("\u{f04c3}", &tooltip, "on");
+        }
+        Err(_) => {
+            print_waybar_json("\u{f04c4}", "KEF \u{00b7} Offline", "off");
+        }
+    }
+}
+
+fn print_waybar_json(text: &str, tooltip: &str, class: &str) {
+    println!(
+        r#"{{"text":"{text}","tooltip":"{tooltip}","class":"{class}","alt":"{class}"}}"#
+    );
+}
+
+fn resolve_waybar_ip(speaker_ip: Option<&str>) -> Option<IpAddr> {
+    if let Some(s) = speaker_ip {
+        return s.parse().ok();
+    }
+    if let Ok(config) = Config::load() {
+        if let Some(ref ip) = config.speaker.ip {
+            return ip.parse().ok();
+        }
+    }
+    config::load_cached_ip()?.parse().ok()
 }
