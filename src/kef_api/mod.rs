@@ -129,7 +129,7 @@ impl KefClient {
 
         Ok(SpeakerState {
             name,
-            model: "LSX II".to_string(),
+            model: detect_model(&firmware),
             firmware,
             ip: self.ip,
             mac,
@@ -144,6 +144,19 @@ impl KefClient {
             eq_profile,
         })
     }
+}
+
+/// Derive the speaker model from the firmware version string.
+/// e.g. `LSXII_4.3.1.0240` → "LSX II", `ls502w_...` → "LS50 Wireless II"
+fn detect_model(firmware: &str) -> String {
+    let prefix = firmware.split('_').next().unwrap_or("").to_lowercase();
+    match prefix.as_str() {
+        "lsxii" => "LSX II",
+        "ls502w" => "LS50 Wireless II",
+        "ls602w" => "LS60 Wireless",
+        _ => "KEF W2",
+    }
+    .to_string()
 }
 
 /// Strip control characters from untrusted network strings to prevent

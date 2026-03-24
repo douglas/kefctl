@@ -130,6 +130,9 @@ async fn speaker_poll_loop(
         api::SPEAKER_STATUS,
         api::MUTE,
         api::CABLE_MODE,
+        api::STANDBY_MODE,
+        api::MAX_VOLUME,
+        api::EQ_PROFILE,
     ];
 
     loop {

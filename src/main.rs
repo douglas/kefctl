@@ -19,7 +19,7 @@ use std::time::Duration;
 use clap::Parser;
 
 use app::{Action, App};
-use cli::{Cli, Commands, SourceArg};
+use cli::{Cli, Commands, MuteArg, SourceArg};
 use config::Config;
 use event::{Event, EventHandler};
 use kef_api::KefClient;
@@ -60,6 +60,10 @@ async fn main() {
         Some(Commands::Volume { level: None }) => {
             let ip = resolve_speaker(speaker_ip);
             cmd_get_volume(ip).await;
+        }
+        Some(Commands::Mute { state }) => {
+            let ip = resolve_speaker(speaker_ip);
+            cmd_mute(ip, state).await;
         }
         Some(Commands::Toggle) => {
             let ip = resolve_speaker(speaker_ip);
@@ -406,6 +410,17 @@ async fn cmd_set_volume(ip: IpAddr, level: i32) {
     let client = KefClient::new(ip);
     unwrap_or_exit(client.set_volume(level).await);
     println!("Volume set to {level}");
+}
+
+async fn cmd_mute(ip: IpAddr, state: Option<MuteArg>) {
+    let client = KefClient::new(ip);
+    let target = match state {
+        Some(MuteArg::On) => true,
+        Some(MuteArg::Off) => false,
+        None => !unwrap_or_exit(client.get_mute().await),
+    };
+    unwrap_or_exit(client.set_mute(target).await);
+    println!("{}", if target { "Muted" } else { "Unmuted" });
 }
 
 /// Resolve which source to wake the speaker to.

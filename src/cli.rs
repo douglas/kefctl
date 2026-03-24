@@ -2,7 +2,7 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-/// KEF LSX II TUI Controller
+/// KEF W2 speaker controller
 #[derive(Debug, Parser)]
 #[command(name = "kefctl", version, about)]
 pub struct Cli {
@@ -39,11 +39,24 @@ pub enum Commands {
         level: Option<i32>,
     },
 
+    /// Get or toggle mute state
+    Mute {
+        /// Set mute explicitly (on/off), or omit to toggle
+        #[arg(value_enum)]
+        state: Option<MuteArg>,
+    },
+
     /// Toggle speaker on/off (wake to last source or send to standby)
     Toggle,
 
     /// Output JSON status for waybar custom module
     Waybar,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum MuteArg {
+    On,
+    Off,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
