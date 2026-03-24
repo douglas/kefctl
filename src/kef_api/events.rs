@@ -64,7 +64,10 @@ impl KefClient {
 
         match serde_json::from_str(&body) {
             Ok(val) => Ok(Some(val)),
-            Err(_) => Ok(None),
+            Err(e) => {
+                tracing::debug!("Failed to parse poll response: {e}");
+                Ok(None)
+            }
         }
     }
 

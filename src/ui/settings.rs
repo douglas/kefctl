@@ -1,4 +1,4 @@
-//! Settings editor panel: cable mode, standby, max volume, LED, startup tone.
+//! Settings editor panel: standby, max volume, LED, startup tone, cable mode (display-only).
 
 use ratatui::{
     Frame,
@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::app::{App, Focus};
 
-const SETTINGS_ROWS: usize = 6;
+const SETTINGS_ROWS: usize = 7;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
@@ -26,8 +26,8 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         Layout::vertical(vec![Constraint::Length(1); SETTINGS_ROWS.max(inner.height as usize)])
             .split(inner);
 
-    let items = [
-        ("Cable Mode", s.cable_mode.display_name().to_string()),
+    // Adjustable rows (focus 0-3)
+    let adjustable = [
         ("Standby", s.standby_mode.display_name().to_string()),
         ("Max Volume", format!("{}", s.max_volume)),
         (
@@ -38,10 +38,9 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             "Startup Tone",
             if s.startup_tone { "ON" } else { "OFF" }.to_string(),
         ),
-        ("", super::HINT_CYCLE.to_string()),
     ];
 
-    for (i, (label, value)) in items.iter().enumerate() {
+    for (i, (label, value)) in adjustable.iter().enumerate() {
         if i >= rows.len() {
             break;
         }
@@ -49,27 +48,32 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             Style::default()
                 .fg(theme.accent)
                 .add_modifier(Modifier::BOLD)
-        } else if label.is_empty() {
-            Style::default().fg(theme.fg_dim)
         } else {
             Style::default().fg(theme.fg)
         };
-
-        let marker = if i == focus && !label.is_empty() {
-            "▸ "
-        } else {
-            "  "
-        };
-        let arrows = if i == focus && !label.is_empty() {
-            "  ◂ ▸"
-        } else {
-            ""
-        };
-        let text = if label.is_empty() {
-            format!("  {value}")
-        } else {
-            format!("{marker}{label:<16} {value}{arrows}")
-        };
+        let marker = if i == focus { "▸ " } else { "  " };
+        let arrows = if i == focus { "  ◂ ▸" } else { "" };
+        let text = format!("{marker}{label:<16} {value}{arrows}");
         frame.render_widget(Paragraph::new(text).style(style), rows[i]);
+    }
+
+    // Display-only info below adjustable rows
+    let info_start = adjustable.len();
+    if info_start < rows.len() {
+        frame.render_widget(Paragraph::new(""), rows[info_start]);
+    }
+    if info_start + 1 < rows.len() {
+        let cable = format!("  Cable Mode       {}", s.cable_mode.display_name());
+        frame.render_widget(
+            Paragraph::new(cable).style(Style::default().fg(theme.fg_dim)),
+            rows[info_start + 1],
+        );
+    }
+    if info_start + 2 < rows.len() {
+        frame.render_widget(
+            Paragraph::new(format!("  {}", super::HINT_CYCLE))
+                .style(Style::default().fg(theme.fg_dim)),
+            rows[info_start + 2],
+        );
     }
 }

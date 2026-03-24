@@ -12,3 +12,4 @@ pub const MAX_VOLUME: &str = "settings:/kef/host/maximumVolume";
 pub const FRONT_LED: &str = "settings:/kef/host/disableFrontStandbyLED";
 pub const STARTUP_TONE: &str = "settings:/kef/host/startupTone";
 pub const SPEAKER_STATUS: &str = "settings:/kef/host/speakerStatus";
+pub const EQ_PROFILE: &str = "kef:eqProfile/v2";

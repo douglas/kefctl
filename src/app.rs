@@ -6,7 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
 
 use crate::kef_api::types::{
-    BassExtension, CableMode, EqProfile, Source, StandbyMode, SubPolarity,
+    BassExtension, CableMode, EqProfile, Source, StandbyMode,
 };
 use crate::ui::theme::Theme;
 
@@ -15,7 +15,6 @@ pub(crate) enum Action {
     SetVolume(i32),
     ToggleMute(bool),
     SetSource(Source),
-    SetCableMode,
     SetStandbyMode(StandbyMode),
     SetMaxVolume(i32),
     SetFrontLed(bool),
@@ -127,18 +126,17 @@ impl SpeakerState {
             front_led: true,
             startup_tone: true,
             eq_profile: EqProfile {
-                name: "Standard".to_string(),
-                treble: 0.0,
                 bass_extension: BassExtension::Standard,
                 desk_mode: true,
-                desk_db: -3.0,
-                wall_mode: false,
-                wall_db: 0.0,
-                sub_out: false,
-                sub_gain: 0.0,
-                sub_polarity: SubPolarity::Positive,
-                sub_crossover: 80,
+                desk_mode_setting: -3.0,
                 phase_correction: true,
+                subwoofer_out: true,
+                subwoofer_polarity: "normal".to_string(),
+                sub_out_lp_freq: 80.0,
+                audio_polarity: "normal".to_string(),
+                high_pass_mode_freq: 95,
+                subwoofer_preset: "custom".to_string(),
+                ..EqProfile::default()
             },
         }
     }
@@ -380,8 +378,10 @@ impl App {
         None
     }
 
+    // EQ panel is read-only — displays live data from kef:eqProfile/v2.
+    // EQ write API to be added in future.
     fn handle_key_eq(&mut self, key: KeyEvent) {
-        let max_focus = 6; // 0-6 are the editable rows
+        let max_focus = 6;
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if self.eq_focus < max_focus {
@@ -393,68 +393,13 @@ impl App {
                     self.eq_focus -= 1;
                 }
             }
-            KeyCode::Right | KeyCode::Char('l') => self.eq_adjust(1),
-            KeyCode::Left | KeyCode::Char('h') if self.eq_focus > 0 => self.eq_adjust(-1),
             KeyCode::Char('h') => self.focus = Focus::Sidebar,
             _ => {}
         }
     }
 
-    fn eq_adjust(&mut self, dir: i32) {
-        let eq = &mut self.speaker.eq_profile;
-        match self.eq_focus {
-            1 => {
-                // Treble: -5.0 to +5.0 in 0.5 steps
-                eq.treble = (eq.treble + f64::from(dir) * 0.5).clamp(-5.0, 5.0);
-            }
-            2 => {
-                // Bass extension
-                eq.bass_extension = if dir > 0 {
-                    eq.bass_extension.cycle_next()
-                } else {
-                    eq.bass_extension.cycle_prev()
-                };
-            }
-            3 => {
-                // Desk mode: toggle on/off, or adjust dB if on
-                if !eq.desk_mode {
-                    eq.desk_mode = true;
-                } else if dir > 0 {
-                    eq.desk_db = (eq.desk_db + 0.5).clamp(-6.0, 0.0);
-                } else {
-                    eq.desk_db = (eq.desk_db - 0.5).clamp(-6.0, 0.0);
-                    if eq.desk_db <= -6.0 {
-                        eq.desk_mode = false;
-                    }
-                }
-            }
-            4 => {
-                // Wall mode: same pattern as desk
-                if !eq.wall_mode {
-                    eq.wall_mode = true;
-                } else if dir > 0 {
-                    eq.wall_db = (eq.wall_db + 0.5).clamp(-6.0, 0.0);
-                } else {
-                    eq.wall_db = (eq.wall_db - 0.5).clamp(-6.0, 0.0);
-                    if eq.wall_db <= -6.0 {
-                        eq.wall_mode = false;
-                    }
-                }
-            }
-            5 => {
-                // Sub out toggle
-                eq.sub_out = !eq.sub_out;
-            }
-            6 => {
-                // Phase correction toggle
-                eq.phase_correction = !eq.phase_correction;
-            }
-            _ => {}
-        }
-    }
-
     fn handle_key_settings(&mut self, key: KeyEvent) -> Option<Action> {
-        let max_focus = 4; // 0-4 are the settings rows
+        let max_focus = 3; // 0=standby, 1=max vol, 2=LED, 3=startup tone (cable mode is display-only)
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if self.settings_focus < max_focus {
@@ -483,13 +428,6 @@ impl App {
     fn settings_cycle(&mut self, dir: i32) -> Option<Action> {
         match self.settings_focus {
             0 => {
-                self.speaker.cable_mode = match self.speaker.cable_mode {
-                    CableMode::Wired => CableMode::Wireless,
-                    CableMode::Wireless => CableMode::Wired,
-                };
-                Some(Action::SetCableMode)
-            }
-            1 => {
                 self.speaker.standby_mode = if dir > 0 {
                     self.speaker.standby_mode.cycle_next()
                 } else {
@@ -497,16 +435,16 @@ impl App {
                 };
                 Some(Action::SetStandbyMode(self.speaker.standby_mode))
             }
-            2 => {
+            1 => {
                 self.speaker.max_volume =
                     (self.speaker.max_volume + dir * 5).clamp(10, 100);
                 Some(Action::SetMaxVolume(self.speaker.max_volume))
             }
-            3 => {
+            2 => {
                 self.speaker.front_led = !self.speaker.front_led;
                 Some(Action::SetFrontLed(self.speaker.front_led))
             }
-            4 => {
+            3 => {
                 self.speaker.startup_tone = !self.speaker.startup_tone;
                 Some(Action::SetStartupTone(self.speaker.startup_tone))
             }
@@ -667,45 +605,12 @@ mod tests {
 
     // -- EQ adjustments --
 
-    #[test]
-    fn treble_clamped() {
-        let mut a = app();
-        a.focus = Focus::Main;
-        a.select_panel(Panel::Eq);
-        a.eq_focus = 1; // treble row
-        a.speaker.eq_profile.treble = 5.0;
-        a.eq_adjust(1);
-        assert!((a.speaker.eq_profile.treble - 5.0).abs() < f64::EPSILON);
-
-        a.speaker.eq_profile.treble = -5.0;
-        a.eq_adjust(-1);
-        assert!((a.speaker.eq_profile.treble - -5.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn desk_mode_toggle_sequence() {
-        let mut a = app();
-        a.eq_focus = 3; // desk mode row
-        a.speaker.eq_profile.desk_mode = false;
-
-        a.eq_adjust(1); // off -> on
-        assert!(a.speaker.eq_profile.desk_mode);
-
-        a.eq_adjust(1); // adjust dB up
-        assert!(a.speaker.eq_profile.desk_mode);
-
-        // Drive dB down to minimum to turn off
-        a.speaker.eq_profile.desk_db = -5.5;
-        a.eq_adjust(-1); // -5.5 -> -6.0, turns off
-        assert!(!a.speaker.eq_profile.desk_mode);
-    }
-
     // -- Settings cycling --
 
     #[test]
     fn standby_mode_cycles_all_variants() {
         let mut a = app();
-        a.settings_focus = 1;
+        a.settings_focus = 0;
         a.speaker.standby_mode = StandbyMode::TwentyMinutes;
 
         a.settings_cycle(1);
@@ -721,7 +626,7 @@ mod tests {
     #[test]
     fn max_volume_clamped() {
         let mut a = app();
-        a.settings_focus = 2;
+        a.settings_focus = 1;
 
         a.speaker.max_volume = 100;
         a.settings_cycle(1);
@@ -735,7 +640,7 @@ mod tests {
     #[test]
     fn led_toggles() {
         let mut a = app();
-        a.settings_focus = 3;
+        a.settings_focus = 2;
         assert!(a.speaker.front_led);
         a.settings_cycle(1);
         assert!(!a.speaker.front_led);
@@ -840,72 +745,9 @@ mod tests {
         a.handle_key(key(KeyCode::Char('k')));
         assert_eq!(a.settings_focus, 0);
 
-        a.settings_focus = 4;
+        a.settings_focus = 3;
         a.handle_key(key(KeyCode::Char('j')));
-        assert_eq!(a.settings_focus, 4);
+        assert_eq!(a.settings_focus, 3);
     }
 
-    // -- Wall mode --
-
-    #[test]
-    fn wall_mode_toggle_sequence() {
-        let mut a = app();
-        a.eq_focus = 4; // wall mode row
-        a.speaker.eq_profile.wall_mode = false;
-
-        a.eq_adjust(1); // off -> on
-        assert!(a.speaker.eq_profile.wall_mode);
-
-        a.eq_adjust(1); // adjust dB up
-        assert!(a.speaker.eq_profile.wall_mode);
-
-        // Drive dB down to minimum to turn off
-        a.speaker.eq_profile.wall_db = -5.5;
-        a.eq_adjust(-1); // -5.5 -> -6.0, turns off
-        assert!(!a.speaker.eq_profile.wall_mode);
-    }
-
-    // -- EQ bass extension / sub / phase --
-
-    #[test]
-    fn eq_bass_extension_cycles() {
-        let mut a = app();
-        a.eq_focus = 2; // bass extension row
-        a.speaker.eq_profile.bass_extension = BassExtension::Standard;
-
-        a.eq_adjust(1);
-        assert_eq!(a.speaker.eq_profile.bass_extension, BassExtension::More);
-
-        a.eq_adjust(-1);
-        assert_eq!(
-            a.speaker.eq_profile.bass_extension,
-            BassExtension::Standard
-        );
-    }
-
-    #[test]
-    fn eq_sub_out_toggles() {
-        let mut a = app();
-        a.eq_focus = 5; // sub out row
-        assert!(!a.speaker.eq_profile.sub_out);
-
-        a.eq_adjust(1);
-        assert!(a.speaker.eq_profile.sub_out);
-
-        a.eq_adjust(1);
-        assert!(!a.speaker.eq_profile.sub_out);
-    }
-
-    #[test]
-    fn eq_phase_correction_toggles() {
-        let mut a = app();
-        a.eq_focus = 6; // phase correction row
-        assert!(a.speaker.eq_profile.phase_correction);
-
-        a.eq_adjust(1);
-        assert!(!a.speaker.eq_profile.phase_correction);
-
-        a.eq_adjust(1);
-        assert!(a.speaker.eq_profile.phase_correction);
-    }
 }

@@ -235,7 +235,6 @@ fn dispatch_action(
                 config::save_last_source(s.serde_name());
                 client.set_source(s).await
             }
-            Action::SetCableMode => Ok(()), // Cable mode is read-only in practice
             Action::SetStandbyMode(m) => client.set_standby_mode(m).await,
             Action::SetMaxVolume(v) => {
                 client
@@ -337,28 +336,9 @@ fn resolve_speaker(ip: Option<&str>) -> IpAddr {
     parse_speaker_ip(&s)
 }
 
-async fn cmd_status(ip: IpAddr) {
-    let client = KefClient::new(ip);
-    match client.fetch_full_state().await {
-        Ok(state) => {
-            println!("Speaker: {} ({})", state.name, state.model);
-            println!("Firmware: {}", state.firmware);
-            println!("IP: {}  MAC: {}", state.ip, state.mac);
-            println!("Source: {}", state.source.display_name());
-            println!(
-                "Volume: {}{}  (max: {})",
-                state.volume,
-                if state.muted { " [MUTED]" } else { "" },
-                state.max_volume,
-            );
-            println!("Cable: {}", state.cable_mode.display_name());
-            println!("Standby: {}", state.standby_mode.display_name());
-            println!(
-                "Front LED: {}  Startup tone: {}",
-                if state.front_led { "on" } else { "off" },
-                if state.startup_tone { "on" } else { "off" },
-            );
-        }
+fn unwrap_or_exit<T>(result: Result<T, impl std::fmt::Display>) -> T {
+    match result {
+        Ok(v) => v,
         Err(e) => {
             eprintln!("Error: {e}");
             std::process::exit(1);
@@ -366,15 +346,32 @@ async fn cmd_status(ip: IpAddr) {
     }
 }
 
+async fn cmd_status(ip: IpAddr) {
+    let client = KefClient::new(ip);
+    let state = unwrap_or_exit(client.fetch_full_state().await);
+    println!("Speaker: {} ({})", state.name, state.model);
+    println!("Firmware: {}", state.firmware);
+    println!("IP: {}  MAC: {}", state.ip, state.mac);
+    println!("Source: {}", state.source.display_name());
+    println!(
+        "Volume: {}{}  (max: {})",
+        state.volume,
+        if state.muted { " [MUTED]" } else { "" },
+        state.max_volume,
+    );
+    println!("Cable: {}", state.cable_mode.display_name());
+    println!("Standby: {}", state.standby_mode.display_name());
+    println!(
+        "Front LED: {}  Startup tone: {}",
+        if state.front_led { "on" } else { "off" },
+        if state.startup_tone { "on" } else { "off" },
+    );
+}
+
 async fn cmd_get_source(ip: IpAddr) {
     let client = KefClient::new(ip);
-    match client.get_source().await {
-        Ok(source) => println!("{}", source.display_name()),
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(1);
-        }
-    }
+    let source = unwrap_or_exit(client.get_source().await);
+    println!("{}", source.display_name());
 }
 
 async fn cmd_set_source(ip: IpAddr, source_arg: SourceArg) {
@@ -389,27 +386,15 @@ async fn cmd_set_source(ip: IpAddr, source_arg: SourceArg) {
     };
 
     let client = KefClient::new(ip);
-    match client.set_source(source).await {
-        Ok(()) => {
-            config::save_last_source(source.serde_name());
-            println!("Source set to {}", source.display_name());
-        }
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(1);
-        }
-    }
+    unwrap_or_exit(client.set_source(source).await);
+    config::save_last_source(source.serde_name());
+    println!("Source set to {}", source.display_name());
 }
 
 async fn cmd_get_volume(ip: IpAddr) {
     let client = KefClient::new(ip);
-    match client.get_volume().await {
-        Ok(vol) => println!("{vol}"),
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(1);
-        }
-    }
+    let vol = unwrap_or_exit(client.get_volume().await);
+    println!("{vol}");
 }
 
 async fn cmd_set_volume(ip: IpAddr, level: i32) {
@@ -419,13 +404,8 @@ async fn cmd_set_volume(ip: IpAddr, level: i32) {
     }
 
     let client = KefClient::new(ip);
-    match client.set_volume(level).await {
-        Ok(()) => println!("Volume set to {level}"),
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(1);
-        }
-    }
+    unwrap_or_exit(client.set_volume(level).await);
+    println!("Volume set to {level}");
 }
 
 /// Resolve which source to wake the speaker to.
@@ -454,35 +434,17 @@ fn resolve_wake_source(config: &Config) -> Source {
 
 async fn cmd_toggle(ip: IpAddr, config: &Config) {
     let client = KefClient::new(ip);
-    let current = match client.get_source().await {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Error: {e}");
-            std::process::exit(1);
-        }
-    };
+    let current = unwrap_or_exit(client.get_source().await);
 
     if current == Source::Standby {
         let wake = resolve_wake_source(config);
-        match client.set_source(wake).await {
-            Ok(()) => {
-                config::save_last_source(wake.serde_name());
-                println!("Waking speaker to {}", wake.display_name());
-            }
-            Err(e) => {
-                eprintln!("Error: {e}");
-                std::process::exit(1);
-            }
-        }
+        unwrap_or_exit(client.set_source(wake).await);
+        config::save_last_source(wake.serde_name());
+        println!("Waking speaker to {}", wake.display_name());
     } else {
         config::save_last_source(current.serde_name());
-        match client.set_source(Source::Standby).await {
-            Ok(()) => println!("Speaker entering standby"),
-            Err(e) => {
-                eprintln!("Error: {e}");
-                std::process::exit(1);
-            }
-        }
+        unwrap_or_exit(client.set_source(Source::Standby).await);
+        println!("Speaker entering standby");
     }
 }
 
@@ -518,7 +480,8 @@ async fn cmd_waybar(speaker_ip: Option<&str>) {
             };
             print_waybar_json("\u{f04c3}", &tooltip, "on");
         }
-        Err(_) => {
+        Err(e) => {
+            tracing::debug!("Waybar: speaker unreachable: {e}");
             print_waybar_json("\u{f04c4}", "KEF \u{00b7} Offline", "off");
         }
     }

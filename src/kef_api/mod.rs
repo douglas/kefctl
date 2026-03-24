@@ -15,7 +15,7 @@ use reqwest::redirect;
 
 use crate::app::SpeakerState;
 use crate::error::KefError;
-use types::{ApiValue, GetDataResponse, SetDataRequest};
+use types::{ApiValue, EqProfile, GetDataResponse, SetDataRequest};
 
 pub(crate) struct KefClient {
     base_url: String,
@@ -99,6 +99,14 @@ impl KefClient {
         extract_bool(data)
     }
 
+    pub async fn get_eq_profile(&self) -> Result<EqProfile, KefError> {
+        let data = self.get_data(paths::EQ_PROFILE).await?;
+        match data.into_iter().next() {
+            Some(ApiValue::EqProfile { value }) => Ok(value),
+            _ => Ok(EqProfile::default()),
+        }
+    }
+
     #[tracing::instrument(skip(self))]
     pub async fn fetch_full_state(&self) -> Result<SpeakerState, KefError> {
         let (name, firmware, mac, source, volume, muted, cable_mode, max_volume) = tokio::try_join!(
@@ -112,10 +120,11 @@ impl KefClient {
             self.get_max_volume(),
         )?;
 
-        let (standby_mode, front_led_disabled, startup_tone) = tokio::try_join!(
+        let (standby_mode, front_led_disabled, startup_tone, eq_profile) = tokio::try_join!(
             self.get_standby_mode(),
             self.get_front_led_disabled(),
             self.get_startup_tone(),
+            self.get_eq_profile(),
         )?;
 
         Ok(SpeakerState {
@@ -132,7 +141,7 @@ impl KefClient {
             max_volume,
             front_led: !front_led_disabled,
             startup_tone,
-            eq_profile: types::EqProfile::default(),
+            eq_profile,
         })
     }
 }

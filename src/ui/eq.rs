@@ -1,4 +1,4 @@
-//! EQ/DSP parameter editor panel.
+//! EQ/DSP panel — read-only display of live data from `kef:eqProfile/v2`.
 
 use ratatui::{
     Frame,
@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::app::{App, Focus};
 
-const EQ_ROWS: usize = 8;
+const EQ_ROWS: usize = 9;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
@@ -27,14 +27,25 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     )
     .split(inner);
 
+    let sub_info = if eq.subwoofer_out {
+        format!(
+            "ON  gain {:+.0} dB  pol {}  LP {} Hz",
+            eq.subwoofer_gain, eq.subwoofer_polarity, eq.sub_out_lp_freq
+        )
+    } else {
+        "OFF".to_string()
+    };
+
     let items = [
-        ("Profile", eq.name.clone()),
-        ("Treble", format!("{:+.1} dB", eq.treble)),
-        ("Bass Extension", eq.bass_extension.display_name().to_string()),
+        ("Treble", format!("{:+.1} dB", eq.treble_amount)),
+        (
+            "Bass Extension",
+            eq.bass_extension.display_name().to_string(),
+        ),
         (
             "Desk Mode",
             if eq.desk_mode {
-                format!("ON  {:+.1} dB", eq.desk_db)
+                format!("ON  {:+.1} dB", eq.desk_mode_setting)
             } else {
                 "OFF".to_string()
             },
@@ -42,29 +53,18 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         (
             "Wall Mode",
             if eq.wall_mode {
-                format!("ON  {:+.1} dB", eq.wall_db)
+                format!("ON  {:+.1} dB", eq.wall_mode_setting)
             } else {
                 "OFF".to_string()
             },
         ),
-        (
-            "Sub Out",
-            if eq.sub_out {
-                format!(
-                    "ON  gain {:+.1} dB  pol {}  xover {} Hz",
-                    eq.sub_gain,
-                    eq.sub_polarity.display_name(),
-                    eq.sub_crossover
-                )
-            } else {
-                "OFF".to_string()
-            },
-        ),
+        ("Sub Out", sub_info),
         (
             "Phase Correction",
             if eq.phase_correction { "ON" } else { "OFF" }.to_string(),
         ),
-        ("", super::HINT_ADJUST.to_string()),
+        ("Balance", format!("{}", eq.balance)),
+        ("", String::new()),
     ];
 
     for (i, (label, value)) in items.iter().enumerate() {
@@ -87,7 +87,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             "  "
         };
         let text = if label.is_empty() {
-            format!("  {value}")
+            String::new()
         } else {
             format!("{marker}{label:<18} {value}")
         };

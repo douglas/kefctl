@@ -192,6 +192,11 @@ pub enum ApiValue {
         #[serde(rename = "kefStandbyMode")]
         value: StandbyMode,
     },
+    #[serde(rename = "kefEqProfileV2")]
+    EqProfile {
+        #[serde(rename = "kefEqProfileV2")]
+        value: EqProfile,
+    },
 }
 
 impl ApiValue {
@@ -242,40 +247,38 @@ impl SetDataRequest {
 
 // ---------- EQ ----------
 
+/// EQ/DSP profile from `kef:eqProfile/v2`.
+/// Fields match the real API response (camelCase serde).
+/// `#[serde(default)]` handles missing fields across firmware versions.
 #[allow(clippy::struct_excessive_bools)] // mirrors KEF API EQ structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct EqProfile {
-    pub name: String,
-    pub treble: f64,
+    pub profile_name: String,
+    pub profile_id: String,
+    pub treble_amount: f64,
     pub bass_extension: BassExtension,
     pub desk_mode: bool,
-    pub desk_db: f64,
+    pub desk_mode_setting: f64,
     pub wall_mode: bool,
-    pub wall_db: f64,
-    pub sub_out: bool,
-    pub sub_gain: f64,
-    pub sub_polarity: SubPolarity,
-    pub sub_crossover: i32,
+    pub wall_mode_setting: f64,
     pub phase_correction: bool,
-}
-
-impl Default for EqProfile {
-    fn default() -> Self {
-        Self {
-            name: "Standard".to_string(),
-            treble: 0.0,
-            bass_extension: BassExtension::Standard,
-            desk_mode: false,
-            desk_db: 0.0,
-            wall_mode: false,
-            wall_db: 0.0,
-            sub_out: false,
-            sub_gain: 0.0,
-            sub_polarity: SubPolarity::Positive,
-            sub_crossover: 80,
-            phase_correction: true,
-        }
-    }
+    pub subwoofer_out: bool,
+    pub subwoofer_gain: f64,
+    pub subwoofer_polarity: String,
+    #[serde(rename = "subOutLPFreq")]
+    pub sub_out_lp_freq: f64,
+    pub subwoofer_count: i32,
+    pub subwoofer_preset: String,
+    pub sub_enable_stereo: bool,
+    pub balance: i32,
+    pub dialogue_mode: bool,
+    pub audio_polarity: String,
+    pub high_pass_mode: bool,
+    pub high_pass_mode_freq: i32,
+    pub is_expert_mode: bool,
+    #[serde(rename = "isKW1")]
+    pub is_kw1: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -295,40 +298,6 @@ impl BassExtension {
             BassExtension::More => "More",
         }
     }
-
-    pub fn cycle_next(self) -> Self {
-        match self {
-            BassExtension::Less => BassExtension::Standard,
-            BassExtension::Standard => BassExtension::More,
-            BassExtension::More => BassExtension::Less,
-        }
-    }
-
-    pub fn cycle_prev(self) -> Self {
-        match self {
-            BassExtension::Less => BassExtension::More,
-            BassExtension::Standard => BassExtension::Less,
-            BassExtension::More => BassExtension::Standard,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub enum SubPolarity {
-    #[default]
-    Positive,
-    Negative,
-}
-
-impl SubPolarity {
-    pub fn display_name(self) -> &'static str {
-        match self {
-            SubPolarity::Positive => "+",
-            SubPolarity::Negative => "−",
-        }
-    }
-
 }
 
 #[cfg(test)]
@@ -481,13 +450,6 @@ mod tests {
     }
 
     #[test]
-    fn bass_extension_cycling() {
-        let b = BassExtension::Less;
-        assert_eq!(b.cycle_next().cycle_next().cycle_next(), BassExtension::Less);
-        assert_eq!(b.cycle_prev().cycle_prev().cycle_prev(), BassExtension::Less);
-    }
-
-    #[test]
     fn bass_extension_display_names() {
         assert_eq!(BassExtension::Less.display_name(), "Less");
         assert_eq!(BassExtension::Standard.display_name(), "Standard");
@@ -519,15 +481,13 @@ mod tests {
     #[test]
     fn eq_profile_default() {
         let eq = EqProfile::default();
-        assert_eq!(eq.name, "Standard");
-        assert_eq!(eq.treble, 0.0);
+        assert_eq!(eq.profile_name, "");
+        assert_eq!(eq.treble_amount, 0.0);
         assert_eq!(eq.bass_extension, BassExtension::Standard);
         assert!(!eq.desk_mode);
         assert!(!eq.wall_mode);
-        assert!(!eq.sub_out);
-        assert_eq!(eq.sub_polarity, SubPolarity::Positive);
-        assert_eq!(eq.sub_crossover, 80);
-        assert!(eq.phase_correction);
+        assert!(!eq.subwoofer_out);
+        assert!(!eq.phase_correction);
     }
 
     #[test]
@@ -538,35 +498,57 @@ mod tests {
     }
 
     #[test]
-    fn eq_profile_serde_roundtrip() {
-        let eq = EqProfile {
-            name: "Custom".to_string(),
-            treble: 2.5,
-            bass_extension: BassExtension::More,
-            desk_mode: true,
-            desk_db: -3.0,
-            wall_mode: false,
-            wall_db: 0.0,
-            sub_out: true,
-            sub_gain: 1.5,
-            sub_polarity: SubPolarity::Negative,
-            sub_crossover: 120,
-            phase_correction: false,
-        };
-        let json = serde_json::to_string(&eq).unwrap();
-        let parsed: EqProfile = serde_json::from_str(&json).unwrap();
+    fn eq_profile_parses_real_api_response() {
+        // Real response from kef:eqProfile/v2 on LSX II
+        let json = r#"{
+            "profileName": "", "profileId": "",
+            "trebleAmount": 0, "bassExtension": "standard",
+            "deskMode": false, "deskModeSetting": -3,
+            "wallMode": false, "wallModeSetting": -3,
+            "phaseCorrection": true, "subwooferOut": true,
+            "subwooferGain": 0, "subwooferPolarity": "normal",
+            "subOutLPFreq": 80, "balance": 0,
+            "dialogueMode": false, "audioPolarity": "normal",
+            "highPassMode": false, "highPassModeFreq": 95,
+            "isExpertMode": false, "isKW1": false,
+            "subwooferCount": 0, "subEnableStereo": false,
+            "subwooferPreset": "custom"
+        }"#;
+        let eq: EqProfile = serde_json::from_str(json).unwrap();
 
-        assert_eq!(parsed.name, "Custom");
-        assert_eq!(parsed.treble, 2.5);
-        assert_eq!(parsed.bass_extension, BassExtension::More);
-        assert!(parsed.desk_mode);
-        assert_eq!(parsed.desk_db, -3.0);
-        assert!(!parsed.wall_mode);
-        assert!(parsed.sub_out);
-        assert_eq!(parsed.sub_gain, 1.5);
-        assert_eq!(parsed.sub_polarity, SubPolarity::Negative);
-        assert_eq!(parsed.sub_crossover, 120);
-        assert!(!parsed.phase_correction);
+        assert_eq!(eq.treble_amount, 0.0);
+        assert_eq!(eq.bass_extension, BassExtension::Standard);
+        assert!(!eq.desk_mode);
+        assert_eq!(eq.desk_mode_setting, -3.0);
+        assert!(eq.phase_correction);
+        assert!(eq.subwoofer_out);
+        assert_eq!(eq.subwoofer_polarity, "normal");
+        assert_eq!(eq.sub_out_lp_freq, 80.0);
+        assert_eq!(eq.balance, 0);
+        assert!(!eq.is_kw1);
+    }
+
+    #[test]
+    fn eq_profile_api_value_roundtrip() {
+        let json = r#"[{"type":"kefEqProfileV2","kefEqProfileV2":{
+            "profileName":"","profileId":"","trebleAmount":0,
+            "bassExtension":"standard","deskMode":false,"deskModeSetting":-3,
+            "wallMode":false,"wallModeSetting":-3,"phaseCorrection":true,
+            "subwooferOut":true,"subwooferGain":0,"subwooferPolarity":"normal",
+            "subOutLPFreq":80,"balance":0,"dialogueMode":false,
+            "audioPolarity":"normal","highPassMode":false,"highPassModeFreq":95,
+            "isExpertMode":false,"isKW1":false,"subwooferCount":0,
+            "subEnableStereo":false,"subwooferPreset":"custom"
+        }}]"#;
+        let resp: GetDataResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.len(), 1);
+        match &resp[0] {
+            ApiValue::EqProfile { value } => {
+                assert!(value.phase_correction);
+                assert_eq!(value.bass_extension, BassExtension::Standard);
+            }
+            _ => panic!("expected EqProfile"),
+        }
     }
 
     #[test]
