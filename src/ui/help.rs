@@ -36,6 +36,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         binding("m", "Toggle mute", theme),
         Line::raw(""),
         heading("Panels", theme),
+        binding("Status", "e to edit speaker name", theme),
         binding("Source", "j/k navigate, Enter to switch", theme),
         binding("EQ / DSP", "j/k navigate, ◂/▸ adjust values", theme),
         binding("Settings", "j/k navigate, h/l cycle options", theme),

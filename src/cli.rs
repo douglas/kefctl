@@ -51,6 +51,9 @@ pub enum Commands {
 
     /// Output JSON status for waybar custom module
     Waybar,
+
+    /// Print the speaker's IP address
+    Ip,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

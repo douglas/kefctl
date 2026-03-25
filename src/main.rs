@@ -72,6 +72,10 @@ async fn main() {
         Some(Commands::Waybar) => {
             cmd_waybar(speaker_ip).await;
         }
+        Some(Commands::Ip) => {
+            let ip = resolve_speaker(speaker_ip);
+            println!("{ip}");
+        }
         None => {
             if cli.demo {
                 run_tui_demo(config).await;
@@ -252,6 +256,9 @@ fn dispatch_action(
             Action::SetStartupTone(on) => client.set_startup_tone(on).await,
             Action::SetEqProfile(eq) => client.set_eq_profile(eq).await,
             Action::SetCableMode(m) => client.set_cable_mode(m).await,
+            Action::SetWakeUpSource(s) => client.set_wake_up_source(s).await,
+            Action::SetAppAnalytics(on) => client.set_app_analytics_disabled(!on).await,
+            Action::SetDeviceName(ref name) => client.set_device_name(name).await,
         };
         if let Err(e) = result {
             tracing::warn!("API action failed: {e}");

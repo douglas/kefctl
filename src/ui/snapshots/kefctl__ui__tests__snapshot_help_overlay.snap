@@ -19,6 +19,7 @@ expression: buffer_text(&buf)
 ┃         │    m                   Toggle mute                       │─────────┘
 ┃         │                                                          │─────────┐
 ┃         │  Panels                                                  │         │
+┃         │    Status              e to edit speaker name            │         │
 ┃         │    Source              j/k navigate, Enter to switch     │         │
 ┃         │    EQ / DSP            j/k navigate, ◂/▸ adjust values   │         │
 ┃         │    Settings            j/k navigate, h/l cycle options   │         │
@@ -26,7 +27,6 @@ expression: buffer_text(&buf)
 ┃         │  General                                                 │         │
 ┃         │    ?                   Show this help                    │         │
 ┃         │    q / Ctrl+c          Quit                              │         │
-┃         │                                                          │         │
 ┃         └ ? or Esc to close ───────────────────────────────────────┘         │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │

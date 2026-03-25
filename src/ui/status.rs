@@ -3,6 +3,8 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
+    style::{Modifier, Style},
+    text::{Line, Span},
     widgets::Paragraph,
 };
 
@@ -29,19 +31,37 @@ fn draw_speaker_info(frame: &mut Frame, app: &App, area: Rect) {
     let rows = Layout::vertical(vec![Constraint::Length(1); 5]).split(inner);
 
     let ip_str = s.ip.to_string();
-    let fields = [
-        ("Name", s.name.as_str()),
+
+    // Name row — show editable text field when in editing mode
+    let name_widget = if app.editing_name {
+        let before = &app.name_buf[..app.name_cursor];
+        let after = &app.name_buf[app.name_cursor..];
+        let line = Line::from(vec![
+            Span::styled(format!("  {:<10}", "Name"), Style::default().fg(theme.fg_dim)),
+            Span::styled(before, Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+            Span::styled("▏", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+            Span::styled(after, Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+        ]);
+        Paragraph::new(line)
+    } else {
+        Paragraph::new(theme.info_row("Name", s.name.as_str()))
+    };
+    if !rows.is_empty() {
+        frame.render_widget(name_widget, rows[0]);
+    }
+
+    let other_fields = [
         ("Model", s.model.as_str()),
         ("Firmware", s.firmware.as_str()),
         ("IP", ip_str.as_str()),
         ("MAC", s.mac.as_str()),
     ];
-
-    for (i, (label, value)) in fields.iter().enumerate() {
-        if i >= rows.len() {
+    for (i, (label, value)) in other_fields.iter().enumerate() {
+        let row_idx = i + 1;
+        if row_idx >= rows.len() {
             break;
         }
-        frame.render_widget(Paragraph::new(theme.info_row(label, value)), rows[i]);
+        frame.render_widget(Paragraph::new(theme.info_row(label, value)), rows[row_idx]);
     }
 }
 
