@@ -8,10 +8,10 @@ expression: buffer_text(&buf)
 ┃    EQ / DSP   ┃│  Front LED        ON                                        │
 ┃▸   Settings   ┃│  Startup Tone     ON                                        │
 ┃    Network    ┃│  Cable Mode       Wireless                                  │
+┃               ┃│  Wake-Up Source   Default                                   │
+┃               ┃│  App Analytics    ON                                        │
 ┃               ┃│                                                             │
 ┃               ┃│  ◂/▸ cycle   Esc back                                       │
-┃               ┃│                                                             │
-┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │

@@ -3,7 +3,7 @@
 use crate::error::KefError;
 use super::KefClient;
 use super::paths;
-use super::types::{ApiValue, CableMode, EqProfile, StandbyMode};
+use super::types::{ApiValue, CableMode, EqProfile, StandbyMode, WakeUpSource};
 
 impl KefClient {
     pub async fn get_cable_mode(&self) -> Result<CableMode, KefError> {
@@ -52,6 +52,33 @@ impl KefClient {
 
     pub async fn set_eq_profile(&self, profile: EqProfile) -> Result<(), KefError> {
         self.set_data(paths::EQ_PROFILE, ApiValue::EqProfile { value: profile })
+            .await
+    }
+
+    pub async fn get_wake_up_source(&self) -> Result<WakeUpSource, KefError> {
+        let data = self.get_data(paths::WAKE_UP_SOURCE).await?;
+        match data.into_iter().next() {
+            Some(ApiValue::WakeUpSource { value }) => Ok(value),
+            _ => Ok(WakeUpSource::default()),
+        }
+    }
+
+    pub async fn set_wake_up_source(&self, source: WakeUpSource) -> Result<(), KefError> {
+        self.set_data(paths::WAKE_UP_SOURCE, ApiValue::WakeUpSource { value: source })
+            .await
+    }
+
+    pub async fn get_app_analytics_disabled(&self) -> Result<bool, KefError> {
+        self.get_bool(paths::APP_ANALYTICS).await
+    }
+
+    pub async fn set_app_analytics_disabled(&self, disabled: bool) -> Result<(), KefError> {
+        self.set_data(paths::APP_ANALYTICS, ApiValue::bool(disabled))
+            .await
+    }
+
+    pub async fn set_device_name(&self, name: &str) -> Result<(), KefError> {
+        self.set_data(paths::DEVICE_NAME, ApiValue::string(name))
             .await
     }
 }

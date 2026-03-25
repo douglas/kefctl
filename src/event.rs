@@ -133,6 +133,7 @@ async fn speaker_poll_loop(
         api::STANDBY_MODE,
         api::MAX_VOLUME,
         api::EQ_PROFILE,
+        api::WAKE_UP_SOURCE,
     ];
 
     loop {

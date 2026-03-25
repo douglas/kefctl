@@ -145,6 +145,60 @@ impl StandbyMode {
     }
 }
 
+// ---------- Wake-Up Source ----------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum WakeUpSource {
+    #[default]
+    #[serde(rename = "wakeup_default")]
+    Default,
+    #[serde(rename = "tv")]
+    Tv,
+    #[serde(rename = "optical")]
+    Optical,
+    #[serde(rename = "coaxial")]
+    Coaxial,
+    #[serde(rename = "analog")]
+    Analog,
+    #[serde(rename = "bluetooth")]
+    Bluetooth,
+}
+
+impl WakeUpSource {
+    pub fn display_name(self) -> &'static str {
+        match self {
+            WakeUpSource::Default => "Default",
+            WakeUpSource::Tv => "TV (HDMI)",
+            WakeUpSource::Optical => "Optical",
+            WakeUpSource::Coaxial => "Coaxial",
+            WakeUpSource::Analog => "Analog",
+            WakeUpSource::Bluetooth => "Bluetooth",
+        }
+    }
+
+    pub fn cycle_next(self) -> Self {
+        match self {
+            WakeUpSource::Default => WakeUpSource::Tv,
+            WakeUpSource::Tv => WakeUpSource::Optical,
+            WakeUpSource::Optical => WakeUpSource::Coaxial,
+            WakeUpSource::Coaxial => WakeUpSource::Analog,
+            WakeUpSource::Analog => WakeUpSource::Bluetooth,
+            WakeUpSource::Bluetooth => WakeUpSource::Default,
+        }
+    }
+
+    pub fn cycle_prev(self) -> Self {
+        match self {
+            WakeUpSource::Default => WakeUpSource::Bluetooth,
+            WakeUpSource::Tv => WakeUpSource::Default,
+            WakeUpSource::Optical => WakeUpSource::Tv,
+            WakeUpSource::Coaxial => WakeUpSource::Optical,
+            WakeUpSource::Analog => WakeUpSource::Coaxial,
+            WakeUpSource::Bluetooth => WakeUpSource::Analog,
+        }
+    }
+}
+
 // ---------- Speaker Status ----------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -208,6 +262,11 @@ pub enum ApiValue {
         #[serde(rename = "kefEqProfileV2")]
         value: EqProfile,
     },
+    #[serde(rename = "kefWakeUpSource")]
+    WakeUpSource {
+        #[serde(rename = "kefWakeUpSource")]
+        value: WakeUpSource,
+    },
 }
 
 impl ApiValue {
@@ -215,7 +274,6 @@ impl ApiValue {
         ApiValue::I32 { value }
     }
 
-    #[cfg(test)]
     pub fn string(value: impl Into<String>) -> Self {
         ApiValue::String {
             value: value.into(),
@@ -505,6 +563,14 @@ mod tests {
         assert_eq!(CableMode::Wireless.cycle_next(), CableMode::Wired);
         assert_eq!(CableMode::Wired.cycle_prev(), CableMode::Wireless);
         assert_eq!(CableMode::Wireless.cycle_prev(), CableMode::Wired);
+    }
+
+    #[test]
+    fn wake_up_source_cycling() {
+        assert_eq!(WakeUpSource::Default.cycle_next(), WakeUpSource::Tv);
+        assert_eq!(WakeUpSource::Bluetooth.cycle_next(), WakeUpSource::Default);
+        assert_eq!(WakeUpSource::Default.cycle_prev(), WakeUpSource::Bluetooth);
+        assert_eq!(WakeUpSource::Tv.cycle_prev(), WakeUpSource::Default);
     }
 
     #[test]

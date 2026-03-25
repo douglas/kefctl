@@ -1,4 +1,4 @@
-//! Settings editor panel: standby, max volume, LED, startup tone, cable mode.
+//! Settings editor panel: standby, max volume, LED, startup tone, cable mode, wake-up source, app analytics.
 
 use ratatui::{
     Frame,
@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::app::{App, Focus};
 
-const SETTINGS_ROWS: usize = 7;
+const SETTINGS_ROWS: usize = 9;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
@@ -26,7 +26,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         Layout::vertical(vec![Constraint::Length(1); SETTINGS_ROWS.max(inner.height as usize)])
             .split(inner);
 
-    // Adjustable rows (focus 0-4)
+    // Adjustable rows (focus 0-6)
     let adjustable = [
         ("Standby", s.standby_mode.display_name().to_string()),
         ("Max Volume", format!("{}", s.max_volume)),
@@ -39,6 +39,11 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             if s.startup_tone { "ON" } else { "OFF" }.to_string(),
         ),
         ("Cable Mode", s.cable_mode.display_name().to_string()),
+        ("Wake-Up Source", s.wake_up_source.display_name().to_string()),
+        (
+            "App Analytics",
+            if s.app_analytics { "ON" } else { "OFF" }.to_string(),
+        ),
     ];
 
     for (i, (label, value)) in adjustable.iter().enumerate() {

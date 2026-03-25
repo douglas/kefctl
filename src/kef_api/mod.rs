@@ -133,11 +133,14 @@ impl KefClient {
             self.get_max_volume(),
         )?;
 
-        let (standby_mode, front_led_disabled, startup_tone, eq_profile) = tokio::try_join!(
+        let (standby_mode, front_led_disabled, startup_tone, eq_profile,
+             wake_up_source, app_analytics_disabled) = tokio::try_join!(
             self.get_standby_mode(),
             self.get_front_led_disabled(),
             self.get_startup_tone(),
             self.get_eq_profile(),
+            self.get_wake_up_source(),
+            self.get_app_analytics_disabled(),
         )?;
 
         Ok(SpeakerState {
@@ -155,6 +158,8 @@ impl KefClient {
             front_led: !front_led_disabled,
             startup_tone,
             eq_profile,
+            wake_up_source,
+            app_analytics: !app_analytics_disabled,
         })
     }
 }

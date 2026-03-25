@@ -6,7 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
 
 use crate::kef_api::types::{
-    BassExtension, CableMode, EqProfile, Source, StandbyMode,
+    BassExtension, CableMode, EqProfile, Source, StandbyMode, WakeUpSource,
 };
 use crate::ui::theme::Theme;
 
@@ -21,6 +21,9 @@ pub(crate) enum Action {
     SetStartupTone(bool),
     SetEqProfile(EqProfile),
     SetCableMode(CableMode),
+    SetWakeUpSource(WakeUpSource),
+    SetAppAnalytics(bool),
+    SetDeviceName(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -88,6 +91,8 @@ pub(crate) struct SpeakerState {
     pub(crate) front_led: bool,
     pub(crate) startup_tone: bool,
     pub(crate) eq_profile: EqProfile,
+    pub(crate) wake_up_source: WakeUpSource,
+    pub(crate) app_analytics: bool,
 }
 
 impl Default for SpeakerState {
@@ -107,6 +112,8 @@ impl Default for SpeakerState {
             front_led: true,
             startup_tone: true,
             eq_profile: EqProfile::default(),
+            wake_up_source: WakeUpSource::default(),
+            app_analytics: true,
         }
     }
 }
@@ -140,6 +147,8 @@ impl SpeakerState {
                 subwoofer_preset: "custom".to_string(),
                 ..EqProfile::default()
             },
+            wake_up_source: WakeUpSource::default(),
+            app_analytics: true,
         }
     }
 }
@@ -151,6 +160,7 @@ pub(crate) struct DiscoveredSpeaker {
     pub(crate) port: u16,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct App {
     pub(crate) speaker: SpeakerState,
     pub(crate) panel: Panel,
@@ -167,6 +177,9 @@ pub(crate) struct App {
     pub(crate) should_quit: bool,
     pub(crate) demo: bool,
     pub(crate) theme: Theme,
+    pub(crate) editing_name: bool,
+    pub(crate) name_buf: String,
+    pub(crate) name_cursor: usize,
 }
 
 impl App {
@@ -192,6 +205,9 @@ impl App {
             should_quit: false,
             demo: false,
             theme: Theme::load(),
+            editing_name: false,
+            name_buf: String::new(),
+            name_cursor: 0,
         }
     }
 
@@ -217,6 +233,9 @@ impl App {
             should_quit: false,
             demo: true,
             theme: Theme::load(),
+            editing_name: false,
+            name_buf: String::new(),
+            name_cursor: 0,
         }
     }
 
@@ -331,6 +350,10 @@ impl App {
     }
 
     fn handle_key_main(&mut self, key: KeyEvent) -> Option<Action> {
+        // Name editing mode intercepts all keys
+        if self.editing_name {
+            return self.handle_key_name_edit(key);
+        }
         // Esc always returns to sidebar
         if key.code == KeyCode::Esc {
             self.focus = Focus::Sidebar;
@@ -341,12 +364,66 @@ impl App {
             Panel::Source => self.handle_key_source(key),
             Panel::Eq => self.handle_key_eq(key),
             Panel::Settings => self.handle_key_settings(key),
-            Panel::Status | Panel::Network => {
+            Panel::Status => {
+                match key.code {
+                    KeyCode::Char('h') => { self.focus = Focus::Sidebar; }
+                    KeyCode::Char('e') => {
+                        self.editing_name = true;
+                        self.name_buf = self.speaker.name.clone();
+                        self.name_cursor = self.name_buf.len();
+                    }
+                    _ => {}
+                }
+                None
+            }
+            Panel::Network => {
                 if key.code == KeyCode::Char('h') {
                     self.focus = Focus::Sidebar;
                 }
                 None
             }
+        }
+    }
+
+    fn handle_key_name_edit(&mut self, key: KeyEvent) -> Option<Action> {
+        match key.code {
+            KeyCode::Esc => {
+                self.editing_name = false;
+                self.name_buf.clear();
+                self.name_cursor = 0;
+                None
+            }
+            KeyCode::Enter => {
+                let name = std::mem::take(&mut self.name_buf);
+                self.editing_name = false;
+                self.name_cursor = 0;
+                if name.is_empty() {
+                    return None;
+                }
+                self.speaker.name.clone_from(&name);
+                Some(Action::SetDeviceName(name))
+            }
+            KeyCode::Left => {
+                if self.name_cursor > 0 { self.name_cursor -= 1; }
+                None
+            }
+            KeyCode::Right => {
+                if self.name_cursor < self.name_buf.len() { self.name_cursor += 1; }
+                None
+            }
+            KeyCode::Backspace => {
+                if self.name_cursor > 0 {
+                    self.name_cursor -= 1;
+                    self.name_buf.remove(self.name_cursor);
+                }
+                None
+            }
+            KeyCode::Char(c) => {
+                self.name_buf.insert(self.name_cursor, c);
+                self.name_cursor += c.len_utf8();
+                None
+            }
+            _ => None,
         }
     }
 
@@ -428,7 +505,7 @@ impl App {
     }
 
     fn handle_key_settings(&mut self, key: KeyEvent) -> Option<Action> {
-        let max_focus = 4; // 0=standby, 1=max vol, 2=LED, 3=startup tone, 4=cable mode
+        let max_focus = 6; // 0=standby, 1=max vol, 2=LED, 3=startup tone, 4=cable mode, 5=wake-up, 6=analytics
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if self.settings_focus < max_focus {
@@ -484,6 +561,18 @@ impl App {
                     self.speaker.cable_mode.cycle_prev()
                 };
                 Some(Action::SetCableMode(self.speaker.cable_mode))
+            }
+            5 => {
+                self.speaker.wake_up_source = if dir > 0 {
+                    self.speaker.wake_up_source.cycle_next()
+                } else {
+                    self.speaker.wake_up_source.cycle_prev()
+                };
+                Some(Action::SetWakeUpSource(self.speaker.wake_up_source))
+            }
+            6 => {
+                self.speaker.app_analytics = !self.speaker.app_analytics;
+                Some(Action::SetAppAnalytics(self.speaker.app_analytics))
             }
             _ => None,
         }
@@ -864,9 +953,9 @@ mod tests {
         a.handle_key(key(KeyCode::Char('k')));
         assert_eq!(a.settings_focus, 0);
 
-        a.settings_focus = 4;
+        a.settings_focus = 6;
         a.handle_key(key(KeyCode::Char('j')));
-        assert_eq!(a.settings_focus, 4);
+        assert_eq!(a.settings_focus, 6);
     }
 
     #[test]
@@ -879,6 +968,74 @@ mod tests {
         assert_eq!(a.speaker.cable_mode, CableMode::Wireless);
         a.settings_cycle(1);
         assert_eq!(a.speaker.cable_mode, CableMode::Wired);
+    }
+
+    #[test]
+    fn settings_wake_up_source_cycles() {
+        let mut a = app();
+        a.settings_focus = 5;
+        a.speaker.wake_up_source = WakeUpSource::Default;
+
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.wake_up_source, WakeUpSource::Tv);
+        a.settings_cycle(-1);
+        assert_eq!(a.speaker.wake_up_source, WakeUpSource::Default);
+        a.settings_cycle(-1);
+        assert_eq!(a.speaker.wake_up_source, WakeUpSource::Bluetooth);
+    }
+
+    #[test]
+    fn settings_app_analytics_toggles() {
+        let mut a = app();
+        a.settings_focus = 6;
+        a.speaker.app_analytics = true;
+
+        a.settings_cycle(1);
+        assert!(!a.speaker.app_analytics);
+        a.settings_cycle(1);
+        assert!(a.speaker.app_analytics);
+    }
+
+    #[test]
+    fn device_name_edit_commit() {
+        let mut a = app();
+        a.focus = Focus::Main;
+        a.select_panel(Panel::Status);
+
+        // 'e' enters edit mode
+        a.handle_key(key(KeyCode::Char('e')));
+        assert!(a.editing_name);
+        assert_eq!(a.name_buf, a.speaker.name.clone());
+
+        // Type a new name character by character
+        a.name_buf.clear();
+        a.name_cursor = 0;
+        for ch in "KEF Test".chars() {
+            a.handle_key(key(KeyCode::Char(ch)));
+        }
+        assert_eq!(a.name_buf, "KEF Test");
+
+        // Enter commits
+        let action = a.handle_key(key(KeyCode::Enter));
+        assert!(!a.editing_name);
+        assert_eq!(a.speaker.name, "KEF Test");
+        assert!(matches!(action, Some(Action::SetDeviceName(ref n)) if n == "KEF Test"));
+    }
+
+    #[test]
+    fn device_name_edit_cancel() {
+        let mut a = app();
+        a.focus = Focus::Main;
+        a.select_panel(Panel::Status);
+
+        let original = a.speaker.name.clone();
+        a.handle_key(key(KeyCode::Char('e')));
+        assert!(a.editing_name);
+
+        // Esc cancels without changing the name
+        a.handle_key(key(KeyCode::Esc));
+        assert!(!a.editing_name);
+        assert_eq!(a.speaker.name, original);
     }
 
 }
