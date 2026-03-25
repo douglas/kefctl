@@ -1,4 +1,4 @@
-//! EQ/DSP panel — read-only display of live data from `kef:eqProfile/v2`.
+//! EQ/DSP panel — adjustable EQ settings via `kef:eqProfile/v2`.
 
 use ratatui::{
     Frame,
@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::app::{App, Focus};
 
-const EQ_ROWS: usize = 9;
+const EQ_ROWS: usize = 10;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
@@ -86,11 +86,26 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         } else {
             "  "
         };
+        let arrows = if i == focus && !label.is_empty() {
+            "  ◂ ▸"
+        } else {
+            ""
+        };
         let text = if label.is_empty() {
             String::new()
         } else {
-            format!("{marker}{label:<18} {value}")
+            format!("{marker}{label:<18} {value}{arrows}")
         };
         frame.render_widget(Paragraph::new(text).style(style), rows[i]);
+    }
+
+    // Hint text below the rows
+    let hint_row = items.len();
+    if hint_row < rows.len() {
+        frame.render_widget(
+            Paragraph::new(format!("  {}", super::HINT_CYCLE))
+                .style(Style::default().fg(theme.fg_dim)),
+            rows[hint_row],
+        );
     }
 }

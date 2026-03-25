@@ -9,7 +9,7 @@ expression: buffer_text(&buf)
 ┃▸   Settings   ┃│  Startup Tone     ON                                        │
 ┃    Network    ┃│                                                             │
 ┃               ┃│  Cable Mode       Wireless                                  │
-┃               ┃│  ◂/▸ cycle   Enter confirm   Esc back                       │
+┃               ┃│  ◂/▸ cycle   Esc back                                       │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │

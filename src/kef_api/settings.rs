@@ -1,9 +1,9 @@
-//! Device settings: cable mode, standby, LED, startup tone.
+//! Device settings: cable mode, standby, LED, startup tone, EQ profile.
 
 use crate::error::KefError;
 use super::KefClient;
 use super::paths;
-use super::types::{ApiValue, CableMode, StandbyMode};
+use super::types::{ApiValue, CableMode, EqProfile, StandbyMode};
 
 impl KefClient {
     pub async fn get_cable_mode(&self) -> Result<CableMode, KefError> {
@@ -42,6 +42,11 @@ impl KefClient {
 
     pub async fn set_startup_tone(&self, enabled: bool) -> Result<(), KefError> {
         self.set_data(paths::STARTUP_TONE, ApiValue::bool(enabled))
+            .await
+    }
+
+    pub async fn set_eq_profile(&self, profile: EqProfile) -> Result<(), KefError> {
+        self.set_data(paths::EQ_PROFILE, ApiValue::EqProfile { value: profile })
             .await
     }
 }

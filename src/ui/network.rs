@@ -36,7 +36,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
     // Discovered speakers list
     if app.network_speakers.is_empty() {
         frame.render_widget(
-            Paragraph::new("  No speakers discovered. Press 'd' to scan.")
+            Paragraph::new("  No speakers discovered.")
                 .style(Style::default().fg(theme.fg_dim)),
             chunks[1],
         );

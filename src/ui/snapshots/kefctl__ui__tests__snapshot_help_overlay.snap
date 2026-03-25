@@ -20,7 +20,7 @@ expression: buffer_text(&buf)
 ┃         │                                                          │─────────┐
 ┃         │  Panels                                                  │         │
 ┃         │    Source              j/k navigate, Enter to switch     │         │
-┃         │    EQ / DSP            j/k navigate, h/l adjust values   │         │
+┃         │    EQ / DSP            j/k navigate, ◂/▸ adjust values   │         │
 ┃         │    Settings            j/k navigate, h/l cycle options   │         │
 ┃         │                                                          │         │
 ┃         │  General                                                 │         │

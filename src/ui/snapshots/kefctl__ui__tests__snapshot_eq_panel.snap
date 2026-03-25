@@ -3,7 +3,7 @@ source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
 ┏ kefctl ━━━━━━━┓┌ EQ / DSP ───────────────────────────────────────────────────┐
-┃    Status     ┃│▸ Treble             +0.0 dB                                 │
+┃    Status     ┃│▸ Treble             +0.0 dB  ◂ ▸                            │
 ┃    Source     ┃│  Bass Extension     Standard                                │
 ┃▸   EQ / DSP   ┃│  Desk Mode          ON  -3.0 dB                             │
 ┃    Settings   ┃│  Wall Mode          OFF                                     │
@@ -11,7 +11,7 @@ expression: buffer_text(&buf)
 ┃               ┃│  Phase Correction   ON                                      │
 ┃               ┃│  Balance            0                                       │
 ┃               ┃│                                                             │
-┃               ┃│                                                             │
+┃               ┃│  ◂/▸ cycle   Esc back                                       │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │

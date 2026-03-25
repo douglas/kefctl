@@ -37,7 +37,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Line::raw(""),
         heading("Panels", theme),
         binding("Source", "j/k navigate, Enter to switch", theme),
-        binding("EQ / DSP", "j/k navigate, h/l adjust values", theme),
+        binding("EQ / DSP", "j/k navigate, ◂/▸ adjust values", theme),
         binding("Settings", "j/k navigate, h/l cycle options", theme),
         Line::raw(""),
         heading("General", theme),

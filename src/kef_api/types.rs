@@ -298,6 +298,22 @@ impl BassExtension {
             BassExtension::More => "More",
         }
     }
+
+    pub fn cycle_next(self) -> Self {
+        match self {
+            BassExtension::Less => BassExtension::Standard,
+            BassExtension::Standard => BassExtension::More,
+            BassExtension::More => BassExtension::Less,
+        }
+    }
+
+    pub fn cycle_prev(self) -> Self {
+        match self {
+            BassExtension::Less => BassExtension::More,
+            BassExtension::Standard => BassExtension::Less,
+            BassExtension::More => BassExtension::Standard,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -454,6 +470,16 @@ mod tests {
         assert_eq!(BassExtension::Less.display_name(), "Less");
         assert_eq!(BassExtension::Standard.display_name(), "Standard");
         assert_eq!(BassExtension::More.display_name(), "More");
+    }
+
+    #[test]
+    fn bass_extension_cycling() {
+        assert_eq!(BassExtension::Less.cycle_next(), BassExtension::Standard);
+        assert_eq!(BassExtension::Standard.cycle_next(), BassExtension::More);
+        assert_eq!(BassExtension::More.cycle_next(), BassExtension::Less);
+        assert_eq!(BassExtension::Less.cycle_prev(), BassExtension::More);
+        assert_eq!(BassExtension::Standard.cycle_prev(), BassExtension::Less);
+        assert_eq!(BassExtension::More.cycle_prev(), BassExtension::Standard);
     }
 
     #[test]
