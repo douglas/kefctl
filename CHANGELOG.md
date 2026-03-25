@@ -2,6 +2,26 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## [0.5.0] — 2026-03-25
+
+### Added
+
+- **EQ panel is now fully adjustable** — Left/Right (or h/l) adjusts all 7 rows: treble (±0.5 dB, clamped ±6 dB), bass extension (Less/Standard/More), desk mode, wall mode, subwoofer out, phase correction, and balance (±1, clamped ±10). Each change writes the full EQ profile to `kef:eqProfile/v2`.
+- **Wake-Up Source setting** — new Settings panel row cycles through Default, TV (HDMI), Optical, Coaxial, Analog, Bluetooth via `settings:/kef/host/wakeUpSource`
+- **App Analytics toggle** — new Settings panel row for `settings:/kef/host/disableAppAnalytics` (ON/OFF)
+- **Cable Mode is now adjustable** — promoted from display-only to an editable Settings panel row (Wired ↔ Wireless)
+- **Inline device name editing** — press `e` on the Status panel to rename the speaker; Left/Right moves cursor, Enter commits, Esc cancels; writes to `settings:/deviceName`
+- **`kefctl ip`** — new CLI command that prints the resolved speaker IP address (no API call)
+- EQ panel shows `◂ ▸` arrows and hint text on the focused row
+- `BassExtension`, `CableMode`, `WakeUpSource` enums gain `cycle_next()` / `cycle_prev()` methods
+- `KefClient::set_eq_profile`, `set_cable_mode`, `set_wake_up_source`, `set_app_analytics_disabled`, `set_device_name` API methods
+
+### Fixed
+
+- Help overlay EQ entry corrected from `"h/l adjust values"` to `"◂/▸ adjust values"`
+- Network panel removed dead `"Press 'd' to scan"` prompt (no `d` handler exists)
+- `HINT_CYCLE` removed `"Enter confirm"` — Settings and EQ values apply immediately on Left/Right
+
 ## [0.4.0] — 2026-03-24
 
 ### Security

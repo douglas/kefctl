@@ -47,6 +47,7 @@ kefctl mute on               # Mute
 kefctl mute off              # Unmute
 kefctl toggle                # Wake or standby the speaker
 kefctl waybar                # JSON status for waybar module
+kefctl ip                    # Print the resolved speaker IP address
 ```
 
 ## TUI Keybindings
@@ -68,7 +69,7 @@ Press `?` in the app for the full keybindings overlay.
 
 ## Panels
 
-**Status** — Speaker info, settings summary
+**Status** — Speaker info, settings summary. Press `e` to rename the speaker inline.
 
 ![Status panel](docs/images/01_status_section.png)
 
@@ -76,11 +77,11 @@ Press `?` in the app for the full keybindings overlay.
 
 ![Source panel](docs/images/02_source_section.png)
 
-**EQ / DSP** — Treble, bass extension, desk/wall mode, subwoofer settings, phase correction
+**EQ / DSP** — Treble, bass extension, desk/wall mode, subwoofer settings, phase correction, balance. All rows adjustable with Left/Right.
 
 ![EQ/DSP panel](docs/images/03_eq_section.png)
 
-**Settings** — Cable mode, standby timeout, max volume, front LED, startup tone
+**Settings** — Standby timeout, max volume, front LED, startup tone, cable mode, wake-up source, app analytics. All rows adjustable with Left/Right.
 
 ![Settings panel](docs/images/04_settings_section.png)
 

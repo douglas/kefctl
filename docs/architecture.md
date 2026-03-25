@@ -2,7 +2,7 @@
 
 ## Overview
 
-kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speakers over HTTP. It combines a Ratatui terminal UI with an async event loop for real-time speaker state updates.
+kefctl is a ~3500-line Rust TUI application that controls KEF W2-platform speakers over HTTP. It combines a Ratatui terminal UI with an async event loop for real-time speaker state updates.
 
 ## Data Flow
 
@@ -83,10 +83,10 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | Module | Responsibility |
 |--------|---------------|
 | `mod.rs` | `KefClient` struct, `get_data`/`set_data` core methods, `fetch_full_state`, `extract_string`/`extract_i32`/`extract_bool` pure functions, `sanitize()` for network strings |
-| `types.rs` | `ApiValue` tagged union serde, `Source`, `StandbyMode`, `CableMode`, `EqProfile` |
+| `types.rs` | `ApiValue` tagged union serde, `Source`, `StandbyMode`, `CableMode`, `WakeUpSource`, `EqProfile` |
 | `volume.rs` | `get_volume`, `set_volume`, `get_max_volume`, `get_mute`, `set_mute` |
 | `source.rs` | `get_source`, `set_source` |
-| `settings.rs` | `get/set_standby_mode`, `get/set_cable_mode`, LED, startup tone |
+| `settings.rs` | `get/set_standby_mode`, `get/set_cable_mode`, `get/set_wake_up_source`, LED, startup tone, app analytics, device name |
 | `paths.rs` | API path string constants |
 | `events.rs` | `subscribe`, `poll_events` (long-poll), `unsubscribe` |
 
@@ -97,10 +97,10 @@ kefctl is a ~3000-line Rust TUI application that controls KEF W2-platform speake
 | `mod.rs` | Top-level layout (sidebar + main), footer bar, notification overlay |
 | `theme.rs` | `Theme` struct (13 color fields), Omarchy loader, `block()` / `info_row()` / `section_block()` helpers |
 | `sidebar.rs` | Panel navigation list with focus highlighting |
-| `status.rs` | Speaker info, settings summary |
+| `status.rs` | Speaker info, settings summary; inline device name editor (`e` key) |
 | `source.rs` | Input source selector with active marker |
 | `eq.rs` | EQ parameter editor (treble, bass ext, desk/wall mode, sub, phase) |
-| `settings.rs` | Settings editor (cable, standby, max vol, LED, startup tone) |
+| `settings.rs` | Settings editor (standby, max vol, LED, startup tone, cable mode, wake-up source, app analytics) |
 | `network.rs` | Connection status + discovered speakers list |
 | `help.rs` | Floating keybindings overlay |
 

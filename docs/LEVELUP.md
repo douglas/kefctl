@@ -559,7 +559,7 @@ kefw2 -s 192.168.50.17 info
 
 ## 11. Testing
 
-kefctl has 96 tests across several categories.
+kefctl has 108 tests across several categories.
 
 ### Test organization
 
