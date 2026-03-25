@@ -14,6 +14,11 @@ impl KefClient {
         }
     }
 
+    pub async fn set_cable_mode(&self, mode: CableMode) -> Result<(), KefError> {
+        self.set_data(paths::CABLE_MODE, ApiValue::CableMode { value: mode })
+            .await
+    }
+
     pub async fn get_standby_mode(&self) -> Result<StandbyMode, KefError> {
         let data = self.get_data(paths::STANDBY_MODE).await?;
         match data.into_iter().next() {

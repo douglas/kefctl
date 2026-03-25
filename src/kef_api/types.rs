@@ -88,6 +88,17 @@ impl CableMode {
             CableMode::Wireless => "Wireless",
         }
     }
+
+    pub fn cycle_next(self) -> Self {
+        match self {
+            CableMode::Wired => CableMode::Wireless,
+            CableMode::Wireless => CableMode::Wired,
+        }
+    }
+
+    pub fn cycle_prev(self) -> Self {
+        self.cycle_next()
+    }
 }
 
 // ---------- Standby Mode ----------
@@ -486,6 +497,14 @@ mod tests {
     fn cable_mode_display_names() {
         assert_eq!(CableMode::Wired.display_name(), "Wired");
         assert_eq!(CableMode::Wireless.display_name(), "Wireless");
+    }
+
+    #[test]
+    fn cable_mode_cycling() {
+        assert_eq!(CableMode::Wired.cycle_next(), CableMode::Wireless);
+        assert_eq!(CableMode::Wireless.cycle_next(), CableMode::Wired);
+        assert_eq!(CableMode::Wired.cycle_prev(), CableMode::Wireless);
+        assert_eq!(CableMode::Wireless.cycle_prev(), CableMode::Wired);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! Settings editor panel: standby, max volume, LED, startup tone, cable mode (display-only).
+//! Settings editor panel: standby, max volume, LED, startup tone, cable mode.
 
 use ratatui::{
     Frame,
@@ -26,7 +26,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         Layout::vertical(vec![Constraint::Length(1); SETTINGS_ROWS.max(inner.height as usize)])
             .split(inner);
 
-    // Adjustable rows (focus 0-3)
+    // Adjustable rows (focus 0-4)
     let adjustable = [
         ("Standby", s.standby_mode.display_name().to_string()),
         ("Max Volume", format!("{}", s.max_volume)),
@@ -38,6 +38,7 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
             "Startup Tone",
             if s.startup_tone { "ON" } else { "OFF" }.to_string(),
         ),
+        ("Cable Mode", s.cable_mode.display_name().to_string()),
     ];
 
     for (i, (label, value)) in adjustable.iter().enumerate() {
@@ -57,23 +58,17 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         frame.render_widget(Paragraph::new(text).style(style), rows[i]);
     }
 
-    // Display-only info below adjustable rows
-    let info_start = adjustable.len();
-    if info_start < rows.len() {
-        frame.render_widget(Paragraph::new(""), rows[info_start]);
+    // Hint row below adjustable rows
+    let hint_row = adjustable.len() + 1; // +1 for blank separator
+    let sep = adjustable.len();
+    if sep < rows.len() {
+        frame.render_widget(Paragraph::new(""), rows[sep]);
     }
-    if info_start + 1 < rows.len() {
-        let cable = format!("  Cable Mode       {}", s.cable_mode.display_name());
-        frame.render_widget(
-            Paragraph::new(cable).style(Style::default().fg(theme.fg_dim)),
-            rows[info_start + 1],
-        );
-    }
-    if info_start + 2 < rows.len() {
+    if hint_row < rows.len() {
         frame.render_widget(
             Paragraph::new(format!("  {}", super::HINT_CYCLE))
                 .style(Style::default().fg(theme.fg_dim)),
-            rows[info_start + 2],
+            rows[hint_row],
         );
     }
 }

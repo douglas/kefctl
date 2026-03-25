@@ -7,8 +7,8 @@ expression: buffer_text(&buf)
 ┃    Source     ┃│  Max Volume       80                                        │
 ┃    EQ / DSP   ┃│  Front LED        ON                                        │
 ┃▸   Settings   ┃│  Startup Tone     ON                                        │
-┃    Network    ┃│                                                             │
-┃               ┃│  Cable Mode       Wireless                                  │
+┃    Network    ┃│  Cable Mode       Wireless                                  │
+┃               ┃│                                                             │
 ┃               ┃│  ◂/▸ cycle   Esc back                                       │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │

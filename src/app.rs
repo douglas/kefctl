@@ -20,6 +20,7 @@ pub(crate) enum Action {
     SetFrontLed(bool),
     SetStartupTone(bool),
     SetEqProfile(EqProfile),
+    SetCableMode(CableMode),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -427,7 +428,7 @@ impl App {
     }
 
     fn handle_key_settings(&mut self, key: KeyEvent) -> Option<Action> {
-        let max_focus = 3; // 0=standby, 1=max vol, 2=LED, 3=startup tone (cable mode is display-only)
+        let max_focus = 4; // 0=standby, 1=max vol, 2=LED, 3=startup tone, 4=cable mode
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if self.settings_focus < max_focus {
@@ -475,6 +476,14 @@ impl App {
             3 => {
                 self.speaker.startup_tone = !self.speaker.startup_tone;
                 Some(Action::SetStartupTone(self.speaker.startup_tone))
+            }
+            4 => {
+                self.speaker.cable_mode = if dir > 0 {
+                    self.speaker.cable_mode.cycle_next()
+                } else {
+                    self.speaker.cable_mode.cycle_prev()
+                };
+                Some(Action::SetCableMode(self.speaker.cable_mode))
             }
             _ => None,
         }
@@ -855,9 +864,21 @@ mod tests {
         a.handle_key(key(KeyCode::Char('k')));
         assert_eq!(a.settings_focus, 0);
 
-        a.settings_focus = 3;
+        a.settings_focus = 4;
         a.handle_key(key(KeyCode::Char('j')));
-        assert_eq!(a.settings_focus, 3);
+        assert_eq!(a.settings_focus, 4);
+    }
+
+    #[test]
+    fn cable_mode_toggles() {
+        let mut a = app();
+        a.settings_focus = 4;
+        a.speaker.cable_mode = CableMode::Wired;
+
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.cable_mode, CableMode::Wireless);
+        a.settings_cycle(1);
+        assert_eq!(a.speaker.cable_mode, CableMode::Wired);
     }
 
 }

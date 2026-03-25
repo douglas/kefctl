@@ -251,6 +251,7 @@ fn dispatch_action(
             Action::SetFrontLed(on) => client.set_front_led_disabled(!on).await,
             Action::SetStartupTone(on) => client.set_startup_tone(on).await,
             Action::SetEqProfile(eq) => client.set_eq_profile(eq).await,
+            Action::SetCableMode(m) => client.set_cable_mode(m).await,
         };
         if let Err(e) = result {
             tracing::warn!("API action failed: {e}");
