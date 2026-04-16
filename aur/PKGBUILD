@@ -1,6 +1,6 @@
 # Maintainer: Douglas Soares de Andrade <contato@douglasandrade.com>
 pkgname=kefctl
-pkgver=0.5.0
+pkgver=0.5.1
 pkgrel=1
 pkgdesc='TUI controller for KEF W2 speakers (LSX II, LS50 Wireless II, LS60 Wireless)'
 arch=('x86_64')

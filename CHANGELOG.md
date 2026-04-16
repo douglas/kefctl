@@ -2,6 +2,17 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## [0.5.1] — 2026-04-16
+
+### Fixed
+
+- Event API compatibility on speakers that reject `GET` for `/api/event/*`:
+  kefctl now retries subscription/poll/unsubscribe with `POST` payload formats.
+- Subscription queue ID parsing now accepts both plain string and object
+  response shapes (e.g. `"uuid"` and `{"queueId":"uuid"}`).
+- Startup subscription now falls back to a core path set when extended paths
+  are rejected, so TUI startup stays connected on older firmware.
+
 ## [0.5.0] — 2026-03-25
 
 ### Added

@@ -124,7 +124,7 @@ async fn speaker_poll_loop(
     cancel: CancellationToken,
 ) {
     // Subscribe to key state changes
-    let paths = &[
+    let paths = [
         api::VOLUME,
         api::SOURCE,
         api::SPEAKER_STATUS,
@@ -135,19 +135,28 @@ async fn speaker_poll_loop(
         api::EQ_PROFILE,
         api::WAKE_UP_SOURCE,
     ];
+    let fallback_paths = &paths[..paths.len() - 1];
 
     loop {
         if cancel.is_cancelled() {
             return;
         }
 
-        let queue_id = match client.subscribe(paths).await {
+        let queue_id = match client.subscribe(&paths).await {
             Ok(id) => id,
-            Err(e) => {
-                let _ = tx.send(Event::SpeakerError(format!("Subscribe failed: {e}")));
-                tokio::select! {
-                    () = cancel.cancelled() => return,
-                    () = tokio::time::sleep(Duration::from_secs(5)) => continue,
+            Err(extended_err) => {
+                tracing::warn!(
+                    "Subscribe with extended paths failed ({extended_err}); retrying with core paths"
+                );
+                match client.subscribe(fallback_paths).await {
+                    Ok(id) => id,
+                    Err(e) => {
+                        let _ = tx.send(Event::SpeakerError(format!("Subscribe failed: {e}")));
+                        tokio::select! {
+                            () = cancel.cancelled() => return,
+                            () = tokio::time::sleep(Duration::from_secs(5)) => continue,
+                        }
+                    }
                 }
             }
         };

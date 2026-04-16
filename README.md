@@ -291,8 +291,8 @@ kefctl communicates with the speaker's HTTP API on port 80:
 
 - **`GET /api/getData?path=...&roles=value`** — Read state (volume, source, settings)
 - **`POST /api/setData`** — Write state (set volume, switch source)
-- **`GET /api/event/modifyQueue?subscribe=...`** — Subscribe to state changes
-- **`GET /api/event/pollQueue?queueId=...&timeout=...`** — Long-poll for events
+- **`GET|POST /api/event/modifyQueue`** — Subscribe/unsubscribe to state changes
+- **`GET|POST /api/event/pollQueue`** — Long-poll for events
 
 Values use a tagged union format: `{"type": "i32_", "i32_": 50}`.
 
