@@ -2,7 +2,7 @@
 
 All notable changes to kefctl will be documented in this file.
 
-## Unreleased
+## [0.6.0] — 2026-07-10
 
 ### Added
 

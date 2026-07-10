@@ -1,10 +1,8 @@
 # cargo-deny configuration — https://embarkstudios.github.io/cargo-deny/
 
 [advisories]
-# Deny crates with known security vulnerabilities
-vulnerability = "deny"
-# Warn on unmaintained crates (not blocking, but worth tracking)
-unmaintained = "warn"
+# Deny unmaintained direct dependencies; allow transitive maintainers to migrate.
+unmaintained = "workspace"
 # Warn on crates that have been yanked from crates.io
 yanked = "warn"
 
@@ -22,6 +20,8 @@ allow = [
     "OpenSSL",
     "Zlib",
     "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "MPL-2.0",
 ]
 
 [bans]
