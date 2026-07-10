@@ -3,11 +3,11 @@ source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
 ┏ kefctl ━━━━━━━┓┌ Source ─────────────────────────────────────────────────────┐
-┃    Status     ┃│▸ ● Wi-Fi                                                    │
-┃▸   Source     ┃│    Bluetooth                                                │
-┃    EQ / DSP   ┃│    TV (HDMI)                                                │
-┃    Settings   ┃│    Optical                                                  │
-┃    Network    ┃│    Coaxial                                                  │
+┃    Speakers   ┃│▸ ● Wi-Fi                                                    │
+┃    Status     ┃│    Bluetooth                                                │
+┃▸   Source     ┃│    TV (HDMI)                                                │
+┃    EQ / DSP   ┃│    Optical                                                  │
+┃    Settings   ┃│    Coaxial                                                  │
 ┃               ┃│    Analog                                                   │
 ┃               ┃│    USB                                                      │
 ┃               ┃│                                                             │

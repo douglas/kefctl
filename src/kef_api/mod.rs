@@ -54,6 +54,10 @@ impl KefClient {
         }
     }
 
+    pub(crate) fn ip(&self) -> IpAddr {
+        self.ip
+    }
+
     #[tracing::instrument(skip(self), fields(path))]
     pub async fn get_data(&self, path: &str) -> Result<GetDataResponse, KefError> {
         let url = format!("{}/api/getData", self.base_url);

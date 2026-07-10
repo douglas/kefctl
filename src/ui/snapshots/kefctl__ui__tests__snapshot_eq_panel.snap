@@ -3,11 +3,11 @@ source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
 ┏ kefctl ━━━━━━━┓┌ EQ / DSP ───────────────────────────────────────────────────┐
-┃    Status     ┃│▸ Treble             +0.0 dB  ◂ ▸                            │
-┃    Source     ┃│  Bass Extension     Standard                                │
-┃▸   EQ / DSP   ┃│  Desk Mode          ON  -3.0 dB                             │
-┃    Settings   ┃│  Wall Mode          OFF                                     │
-┃    Network    ┃│  Sub Out            ON  gain +0 dB  pol normal  LP 80 Hz    │
+┃    Speakers   ┃│▸ Treble             +0.0 dB  ◂ ▸                            │
+┃    Status     ┃│  Bass Extension     Standard                                │
+┃    Source     ┃│  Desk Mode          ON  -3.0 dB                             │
+┃▸   EQ / DSP   ┃│  Wall Mode          OFF                                     │
+┃    Settings   ┃│  Sub Out            ON  gain +0 dB  pol normal  LP 80 Hz    │
 ┃               ┃│  Phase Correction   ON                                      │
 ┃               ┃│  Balance            0                                       │
 ┃               ┃│                                                             │

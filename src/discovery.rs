@@ -57,5 +57,7 @@ pub(crate) async fn discover_speakers(
     }
 
     let _ = mdns.shutdown();
+    speakers.sort_by_key(|speaker| speaker.ip);
+    speakers.dedup_by_key(|speaker| speaker.ip);
     Ok(speakers)
 }

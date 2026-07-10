@@ -21,10 +21,10 @@ kefctl is a ~3500-line Rust TUI application that controls KEF W2-platform speake
 ### Startup sequence
 
 1. Parse CLI args (clap) and load `~/.config/kefctl/config.toml`
-2. Resolve speaker IP: `--speaker` flag → config file → cached IP → mDNS discovery
+2. Resolve speaker IP: `--speaker` flag → default config → cached IP → configured speaker list → mDNS discovery
 3. `KefClient::fetch_full_state()` — parallel HTTP GETs for all settings
 4. Initialize `App` with `SpeakerState` + `Theme::load()`
-5. Enter TUI event loop
+5. Enter TUI event loop and refresh mDNS discovery in the background
 
 ### Event loop (main.rs → run_tui_loop)
 
@@ -101,7 +101,7 @@ kefctl is a ~3500-line Rust TUI application that controls KEF W2-platform speake
 | `source.rs` | Input source selector with active marker |
 | `eq.rs` | EQ parameter editor (treble, bass ext, desk/wall mode, sub, phase) |
 | `settings.rs` | Settings editor (standby, max vol, LED, startup tone, cable mode, wake-up source, app analytics) |
-| `network.rs` | Connection status + discovered speakers list |
+| `network.rs` | Active connection + selectable configured/discovered speaker list |
 | `help.rs` | Floating keybindings overlay |
 
 ## Key Patterns
@@ -129,7 +129,9 @@ When the user presses a key (e.g., volume up), the app:
 
 All colors flow through `app.theme`. The `Theme::block(title, focused)` helper eliminates duplicated border construction across panels. `info_row()` and `section_block()` provide consistent styling for labeled key-value rows and sub-sections. SIGUSR1 triggers `Theme::load()` which re-reads Omarchy colors.
 
-### Speaker event polling
+### Speaker selection and event polling
+
+The Speakers panel merges configured `[[speakers]]` entries with mDNS results. Selecting a different IP fetches its full state first, then replaces the active `KefClient` and polling task. Poll events carry their source IP so late events from a previous speaker are ignored.
 
 1. Subscribe to paths via `GET /api/event/modifyQueue`
 2. Long-poll via `GET /api/event/pollQueue` (30s server timeout, 60s client timeout)

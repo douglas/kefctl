@@ -9,6 +9,7 @@ use crate::error::KefError;
 #[serde(default)]
 pub(crate) struct Config {
     pub(crate) speaker: SpeakerConfig,
+    pub(crate) speakers: Vec<SpeakerConfig>,
     pub(crate) ui: UiConfig,
 }
 
@@ -190,12 +191,18 @@ mod tests {
             ip = "192.168.1.100"
             name = "Living Room"
 
+            [[speakers]]
+            ip = "192.168.1.101"
+            name = "Office"
+
             [ui]
             refresh_ms = 500
         "#;
         let config = Config::load_from_str(toml).unwrap();
         assert_eq!(config.speaker.ip.as_deref(), Some("192.168.1.100"));
         assert_eq!(config.speaker.name.as_deref(), Some("Living Room"));
+        assert_eq!(config.speakers.len(), 1);
+        assert_eq!(config.speakers[0].ip.as_deref(), Some("192.168.1.101"));
         assert_eq!(config.ui.refresh_ms, 500);
     }
 
@@ -208,6 +215,7 @@ mod tests {
         let config = Config::load_from_str(toml).unwrap();
         assert_eq!(config.speaker.ip.as_deref(), Some("10.0.0.5"));
         assert_eq!(config.speaker.name, None);
+        assert!(config.speakers.is_empty());
         assert_eq!(config.ui.refresh_ms, 1000);
     }
 
@@ -216,6 +224,7 @@ mod tests {
         let config = Config::load_from_str("").unwrap();
         assert_eq!(config.speaker.ip, None);
         assert_eq!(config.speaker.name, None);
+        assert!(config.speakers.is_empty());
         assert_eq!(config.ui.refresh_ms, 1000);
     }
 

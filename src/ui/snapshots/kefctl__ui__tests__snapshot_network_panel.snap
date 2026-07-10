@@ -2,12 +2,12 @@
 source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
-┏ kefctl ━━━━━━━┓┌ Network ────────────────────────────────────────────────────┐
-┃    Status     ┃│  Status: ● Connected                                        │
-┃    Source     ┃│  IP: 192.168.50.17                                          │
-┃    EQ / DSP   ┃│  Name: Living Room LSX II                                   │
-┃    Settings   ┃│  No speakers discovered.                                    │
-┃▸   Network    ┃│                                                             │
+┏ kefctl ━━━━━━━┓┌ Speakers ───────────────────────────────────────────────────┐
+┃▸   Speakers   ┃│  Status: ● Connected                                        │
+┃    Status     ┃│  IP: 192.168.50.17                                          │
+┃    Source     ┃│  Name: Living Room LSX II                                   │
+┃    EQ / DSP   ┃│  Available speakers:                                        │
+┃    Settings   ┃│▸   ● Living Room LSX II  192.168.50.17:80                   │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
@@ -25,4 +25,4 @@ expression: buffer_text(&buf)
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┗━━━━━━━━━━━━━━━┛└─────────────────────────────────────────────────────────────┘
- ?  Help │  +/-  vol │  m  mute │  Tab  panel● Living Room LSX II │ Network
+ ?  Help │  +/-  vol │  m  mute │  Tab  panel● Living Room LSX II │ Speakers

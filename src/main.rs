@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use clap::Parser;
 
-use app::{Action, App};
+use app::{Action, App, DiscoveredSpeaker};
 use cli::{Cli, Commands, MuteArg, SourceArg};
 use config::Config;
 use event::{Event, EventHandler};
@@ -38,42 +38,46 @@ async fn main() {
     };
 
     let speaker_ip = cli.speaker.as_deref().or(config.speaker.ip.as_deref());
+    let configured_ip = config
+        .speakers
+        .first()
+        .and_then(|speaker| speaker.ip.as_deref());
 
     match cli.command {
         Some(Commands::Discover) => cmd_discover().await,
         Some(Commands::Status) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_status(ip).await;
         }
         Some(Commands::Source { source: Some(s) }) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_set_source(ip, s).await;
         }
         Some(Commands::Source { source: None }) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_get_source(ip).await;
         }
         Some(Commands::Volume { level: Some(v) }) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_set_volume(ip, v).await;
         }
         Some(Commands::Volume { level: None }) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_get_volume(ip).await;
         }
         Some(Commands::Mute { state }) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_mute(ip, state).await;
         }
         Some(Commands::Toggle) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             cmd_toggle(ip, &config).await;
         }
         Some(Commands::Waybar) => {
             cmd_waybar(speaker_ip).await;
         }
         Some(Commands::Ip) => {
-            let ip = resolve_speaker(speaker_ip);
+            let ip = resolve_speaker(speaker_ip, configured_ip);
             println!("{ip}");
         }
         None => {
@@ -94,6 +98,8 @@ async fn run_tui_demo(config: Config) {
 }
 
 async fn run_tui_live(ip_str: Option<String>, config: Config) {
+    let mut network_speakers = configured_speakers(&config);
+
     // Resolve speaker IP: flag/config > cached IP > mDNS discovery
     let ip: IpAddr = if let Some(ref s) = ip_str {
         s.parse().unwrap_or_else(|_| {
@@ -102,24 +108,21 @@ async fn run_tui_live(ip_str: Option<String>, config: Config) {
         })
     } else if let Some(cached) = try_cached_ip().await {
         cached
+    } else if let Some(speaker) = network_speakers.first() {
+        speaker.ip
     } else {
         eprintln!("Discovering speakers...");
         match discovery::discover_speakers(Duration::from_secs(5)).await {
-            Ok(speakers) if speakers.len() == 1 => speakers[0].ip,
+            Ok(speakers) if !speakers.is_empty() => {
+                let ip = speakers[0].ip;
+                network_speakers = speakers;
+                ip
+            }
             Ok(speakers) if speakers.is_empty() => {
-                eprintln!(
-                    "No KEF speakers found. Use --speaker <ip> or set ip in config."
-                );
+                eprintln!("No KEF speakers found. Use --speaker <ip> or set ip in config.");
                 std::process::exit(1);
             }
-            Ok(speakers) => {
-                eprintln!("Multiple speakers found:");
-                for s in &speakers {
-                    eprintln!("  {} — {}", s.name, s.ip);
-                }
-                eprintln!("Use --speaker <ip> to select one.");
-                std::process::exit(1);
-            }
+            Ok(_) => unreachable!("speaker list is either empty or non-empty"),
             Err(e) => {
                 eprintln!("Discovery error: {e}");
                 std::process::exit(1);
@@ -142,12 +145,20 @@ async fn run_tui_live(ip_str: Option<String>, config: Config) {
     // Cache the working IP for next launch
     config::save_cached_ip(&ip);
 
-    let app = App::new_live(state);
+    if !network_speakers.iter().any(|speaker| speaker.ip == ip) {
+        network_speakers.push(DiscoveredSpeaker {
+            name: state.name.clone(),
+            ip,
+            port: 80,
+        });
+    }
+
+    let app = App::new_live(state, network_speakers);
     let tick_rate = Duration::from_millis(config.ui.refresh_ms);
     run_tui_loop(app, Some(client), tick_rate).await;
 }
 
-async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: Duration) {
+async fn run_tui_loop(mut app: App, mut client: Option<Arc<KefClient>>, tick_rate: Duration) {
     let mut terminal = match tui::init() {
         Ok(t) => t,
         Err(e) => {
@@ -165,6 +176,10 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
 
     let mut events = EventHandler::new(tick_rate, client.clone());
     let event_tx = events.sender();
+    let mut pending_client = None;
+    if !app.demo {
+        request_discovery(event_tx.clone());
+    }
 
     loop {
         if let Err(e) = terminal.draw(|frame| ui::draw(frame, &mut app)) {
@@ -180,8 +195,20 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
                 if app.should_quit {
                     break;
                 }
-                if let (Some(action), Some(client)) = (action, client.as_ref()) {
-                    dispatch_action(client.clone(), action, event_tx.clone());
+                if let Some(action) = action {
+                    match action {
+                        Action::SelectSpeaker(ip) => {
+                            let next_client = Arc::new(KefClient::new(ip));
+                            pending_client = Some(next_client.clone());
+                            request_speaker_switch(next_client, event_tx.clone());
+                        }
+                        Action::RefreshSpeakers => request_discovery(event_tx.clone()),
+                        action => {
+                            if let Some(client) = client.as_ref() {
+                                dispatch_action(client.clone(), action, event_tx.clone());
+                            }
+                        }
+                    }
                 }
             }
             Some(Event::Tick) => {
@@ -191,14 +218,36 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
                 app.theme = ui::theme::Theme::load();
             }
             Some(Event::Resize) => {}
-            Some(Event::SpeakerUpdate(state)) => {
-                app.speaker = *state;
-                app.connection = app::ConnectionState::Connected;
+            Some(Event::SpeakerUpdate { ip, state }) => {
+                if ip == app.speaker.ip && app.switching_to.is_none() {
+                    app.speaker = *state;
+                    app.connection = app::ConnectionState::Connected;
+                }
             }
-            Some(Event::SpeakerError(msg)) => {
-                app.set_notification(msg);
-                app.connection = app::ConnectionState::Disconnected;
+            Some(Event::SpeakerError { ip, message }) => {
+                if ip == app.speaker.ip && app.switching_to.is_none() {
+                    app.set_notification(message);
+                    app.connection = app::ConnectionState::Disconnected;
+                }
             }
+            Some(Event::SpeakerSwitchFinished { ip, result }) => {
+                finish_speaker_switch(
+                    &mut app,
+                    &mut events,
+                    &mut client,
+                    &mut pending_client,
+                    ip,
+                    result,
+                );
+            }
+            Some(Event::SpeakersDiscovered(result)) => match result {
+                Ok(speakers) => app.set_network_speakers(speakers),
+                Err(message) => {
+                    app.discovery_in_progress = false;
+                    app.set_network_speakers(Vec::new());
+                    app.set_notification(format!("Discovery failed: {message}"));
+                }
+            },
             None => break,
         }
     }
@@ -207,6 +256,91 @@ async fn run_tui_loop(mut app: App, client: Option<Arc<KefClient>>, tick_rate: D
     if let Err(e) = tui::restore() {
         eprintln!("Failed to restore terminal: {e}");
     }
+}
+
+fn request_speaker_switch(client: Arc<KefClient>, tx: tokio::sync::mpsc::UnboundedSender<Event>) {
+    tokio::spawn(async move {
+        let ip = client.ip();
+        let result = client
+            .fetch_full_state()
+            .await
+            .map(Box::new)
+            .map_err(|e| e.to_string());
+        let _ = tx.send(Event::SpeakerSwitchFinished { ip, result });
+    });
+}
+
+fn finish_speaker_switch(
+    app: &mut App,
+    events: &mut EventHandler,
+    client: &mut Option<Arc<KefClient>>,
+    pending_client: &mut Option<Arc<KefClient>>,
+    ip: IpAddr,
+    result: Result<Box<app::SpeakerState>, String>,
+) {
+    if app.switching_to != Some(ip) {
+        return;
+    }
+    app.switching_to = None;
+
+    match result {
+        Ok(state) => {
+            let Some(next_client) = pending_client.take() else {
+                app.set_notification("Speaker switch was cancelled".to_string());
+                app.connection = app::ConnectionState::Disconnected;
+                return;
+            };
+            app.speaker = *state;
+            app.connection = app::ConnectionState::Connected;
+            app.set_network_speakers(Vec::new());
+            app.set_notification(format!("Selected {}", app.speaker.name));
+            config::save_cached_ip(&ip);
+            events.set_speaker(next_client.clone());
+            *client = Some(next_client);
+        }
+        Err(message) => {
+            *pending_client = None;
+            app.connection = if client.is_some() {
+                app::ConnectionState::Connected
+            } else {
+                app::ConnectionState::Disconnected
+            };
+            app.set_notification(format!("Failed to connect to {ip}: {message}"));
+        }
+    }
+}
+
+fn configured_speakers(config: &Config) -> Vec<DiscoveredSpeaker> {
+    let mut speakers: Vec<_> = std::iter::once(&config.speaker)
+        .chain(&config.speakers)
+        .filter_map(|speaker| {
+            let ip: IpAddr = speaker
+                .ip
+                .as_deref()?
+                .parse()
+                .map_err(|e| {
+                    tracing::warn!("Ignoring configured speaker with invalid IP: {e}");
+                })
+                .ok()?;
+            Some(DiscoveredSpeaker {
+                name: speaker.name.clone().unwrap_or_else(|| ip.to_string()),
+                ip,
+                port: 80,
+            })
+        })
+        .collect();
+    let mut seen = std::collections::HashSet::new();
+    speakers.retain(|speaker| seen.insert(speaker.ip));
+    speakers
+}
+
+fn request_discovery(tx: tokio::sync::mpsc::UnboundedSender<Event>) {
+    tokio::spawn(async move {
+        let result = discovery::discover_speakers(Duration::from_secs(5))
+            .await
+            .map_err(|e| e.to_string());
+        let _ = tx.send(Event::SpeakersDiscovered(result));
+    });
 }
 
 /// Try the cached speaker IP — quick probe to see if the speaker is still there.
@@ -235,6 +369,7 @@ fn dispatch_action(
     action: Action,
     tx: tokio::sync::mpsc::UnboundedSender<Event>,
 ) {
+    let ip = client.ip();
     tokio::spawn(async move {
         let result = match action {
             Action::SetVolume(v) => client.set_volume(v).await,
@@ -259,10 +394,14 @@ fn dispatch_action(
             Action::SetWakeUpSource(s) => client.set_wake_up_source(s).await,
             Action::SetAppAnalytics(on) => client.set_app_analytics_disabled(!on).await,
             Action::SetDeviceName(ref name) => client.set_device_name(name).await,
+            Action::SelectSpeaker(_) | Action::RefreshSpeakers => return,
         };
         if let Err(e) = result {
             tracing::warn!("API action failed: {e}");
-            let _ = tx.send(Event::SpeakerError(format!("Action failed: {e}")));
+            let _ = tx.send(Event::SpeakerError {
+                ip,
+                message: format!("Action failed: {e}"),
+            });
         }
     });
 }
@@ -327,13 +466,16 @@ async fn cmd_discover() {
     }
 }
 
-fn require_speaker(ip: Option<&str>) -> String {
+fn require_speaker(ip: Option<&str>, configured_ip: Option<&str>) -> String {
     if let Some(s) = ip {
         return s.to_string();
     }
     if let Some(cached) = config::load_cached_ip() {
         eprintln!("Using cached speaker {cached} (use --speaker to override)");
         return cached.to_string();
+    }
+    if let Some(configured) = configured_ip {
+        return configured.to_string();
     }
     eprintln!(
         "No speaker specified. Use --speaker <ip>, \
@@ -350,8 +492,8 @@ fn parse_speaker_ip(ip_str: &str) -> IpAddr {
     })
 }
 
-fn resolve_speaker(ip: Option<&str>) -> IpAddr {
-    let s = require_speaker(ip);
+fn resolve_speaker(ip: Option<&str>, configured_ip: Option<&str>) -> IpAddr {
+    let s = require_speaker(ip, configured_ip);
     parse_speaker_ip(&s)
 }
 
@@ -531,10 +673,62 @@ fn resolve_waybar_ip(speaker_ip: Option<&str>) -> Option<IpAddr> {
     if let Some(s) = speaker_ip {
         return s.parse().ok();
     }
-    if let Ok(config) = Config::load() {
-        if let Some(ref ip) = config.speaker.ip {
-            return ip.parse().ok();
-        }
+    if let Some(cached) = config::load_cached_ip() {
+        return Some(cached);
     }
-    config::load_cached_ip()
+    Config::load()
+        .ok()?
+        .speakers
+        .first()?
+        .ip
+        .as_deref()?
+        .parse()
+        .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configured_speaker_list_supports_multiple_devices() {
+        let config = Config::load_from_str(
+            r#"
+                [[speakers]]
+                ip = "192.168.50.20"
+                name = "Desk"
+
+                [[speakers]]
+                ip = "192.168.50.17"
+                name = "Living Room"
+
+                [[speakers]]
+                ip = "192.168.50.20"
+                name = "Duplicate Desk"
+            "#,
+        )
+        .unwrap();
+
+        let speakers = configured_speakers(&config);
+
+        assert_eq!(speakers.len(), 2);
+        assert_eq!(speakers[0].name, "Desk");
+        assert_eq!(speakers[0].ip, "192.168.50.20".parse::<IpAddr>().unwrap());
+        assert_eq!(speakers[1].name, "Living Room");
+        assert_eq!(speakers[1].ip, "192.168.50.17".parse::<IpAddr>().unwrap());
+    }
+
+    #[test]
+    fn configured_speaker_list_ignores_invalid_addresses() {
+        let config = Config::load_from_str(
+            r#"
+                [[speakers]]
+                ip = "not-an-ip"
+                name = "Invalid"
+            "#,
+        )
+        .unwrap();
+
+        assert!(configured_speakers(&config).is_empty());
+    }
 }

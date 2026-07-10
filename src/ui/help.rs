@@ -13,7 +13,7 @@ use crate::ui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App) {
     let theme = &app.theme;
-    let area = centered_rect(60, 22, frame.area());
+    let area = centered_rect(60, 24, frame.area());
 
     frame.render_widget(Clear, area);
 
@@ -36,6 +36,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         binding("m", "Toggle mute", theme),
         Line::raw(""),
         heading("Panels", theme),
+        binding("Speakers", "j/k navigate, Enter select, r refresh", theme),
         binding("Status", "e to edit speaker name", theme),
         binding("Source", "j/k navigate, Enter to switch", theme),
         binding("EQ / DSP", "j/k navigate, ◂/▸ adjust values", theme),

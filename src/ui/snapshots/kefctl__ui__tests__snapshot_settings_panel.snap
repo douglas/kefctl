@@ -3,11 +3,11 @@ source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
 ┏ kefctl ━━━━━━━┓┌ Settings ───────────────────────────────────────────────────┐
-┃    Status     ┃│▸ Standby          60 minutes  ◂ ▸                           │
-┃    Source     ┃│  Max Volume       80                                        │
-┃    EQ / DSP   ┃│  Front LED        ON                                        │
-┃▸   Settings   ┃│  Startup Tone     ON                                        │
-┃    Network    ┃│  Cable Mode       Wireless                                  │
+┃    Speakers   ┃│▸ Standby          60 minutes  ◂ ▸                           │
+┃    Status     ┃│  Max Volume       80                                        │
+┃    Source     ┃│  Front LED        ON                                        │
+┃    EQ / DSP   ┃│  Startup Tone     ON                                        │
+┃▸   Settings   ┃│  Cable Mode       Wireless                                  │
 ┃               ┃│  Wake-Up Source   Default                                   │
 ┃               ┃│  App Analytics    ON                                        │
 ┃               ┃│                                                             │

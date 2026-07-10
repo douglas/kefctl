@@ -3,11 +3,11 @@ source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
 ┏ kefctl ━━━━━━━┓┌ Speaker Info ───────────────────────────────────────────────┐
-┃▸   Status     ┃│  Name      Living Room LSX II                               │
-┃    Source     ┃│  Model     LSX II                                           │
-┃    EQ / DSP   ┃│  Firmware  4.3.1.0240                                       │
-┃    Settings   ┃│  IP        192.168.50.17                                    │
-┃    Network    ┃│  MAC       AA:BB:CC:DD:EE:FF                                │
+┃    Speakers   ┃│  Name      Living Room LSX II                               │
+┃▸   Status     ┃│  Model     LSX II                                           │
+┃    Source     ┃│  Firmware  4.3.1.0240                                       │
+┃    EQ / DSP   ┃│  IP        192.168.50.17                                    │
+┃    Settings   ┃│  MAC       AA:BB:CC:DD:EE:FF                                │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┃               ┃│                                                             │

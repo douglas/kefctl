@@ -1,5 +1,6 @@
 //! Async event multiplexer: terminal input, tick timer, speaker polling, SIGUSR1.
 
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,7 +9,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::app::SpeakerState;
+use crate::app::{DiscoveredSpeaker, SpeakerState};
 use crate::kef_api::KefClient;
 use crate::kef_api::paths as api;
 
@@ -17,8 +18,19 @@ pub(crate) enum Event {
     Key(KeyEvent),
     Resize,
     Tick,
-    SpeakerUpdate(Box<SpeakerState>),
-    SpeakerError(String),
+    SpeakerUpdate {
+        ip: IpAddr,
+        state: Box<SpeakerState>,
+    },
+    SpeakerError {
+        ip: IpAddr,
+        message: String,
+    },
+    SpeakerSwitchFinished {
+        ip: IpAddr,
+        result: Result<Box<SpeakerState>, String>,
+    },
+    SpeakersDiscovered(Result<Vec<DiscoveredSpeaker>, String>),
     ThemeChanged,
 }
 
@@ -26,6 +38,7 @@ pub(crate) struct EventHandler {
     rx: mpsc::UnboundedReceiver<Event>,
     tx: mpsc::UnboundedSender<Event>,
     cancel: CancellationToken,
+    speaker_cancel: Option<CancellationToken>,
 }
 
 impl EventHandler {
@@ -70,15 +83,6 @@ impl EventHandler {
             }
         });
 
-        // Speaker poll task (only if we have a client)
-        if let Some(client) = client {
-            let tx_speaker = tx.clone();
-            let token = cancel.clone();
-            tokio::spawn(async move {
-                speaker_poll_loop(client, tx_speaker, token).await;
-            });
-        }
-
         // SIGUSR1 theme reload listener
         #[cfg(unix)]
         {
@@ -102,7 +106,16 @@ impl EventHandler {
             });
         }
 
-        Self { rx, tx, cancel }
+        let mut handler = Self {
+            rx,
+            tx,
+            cancel,
+            speaker_cancel: None,
+        };
+        if let Some(client) = client {
+            handler.set_speaker(client);
+        }
+        handler
     }
 
     pub(crate) async fn next(&mut self) -> Option<Event> {
@@ -113,7 +126,24 @@ impl EventHandler {
         self.tx.clone()
     }
 
-    pub(crate) fn shutdown(&self) {
+    pub(crate) fn set_speaker(&mut self, client: Arc<KefClient>) {
+        self.clear_speaker();
+        let tx = self.tx.clone();
+        let token = self.cancel.child_token();
+        self.speaker_cancel = Some(token.clone());
+        tokio::spawn(async move {
+            speaker_poll_loop(client, tx, token).await;
+        });
+    }
+
+    fn clear_speaker(&mut self) {
+        if let Some(token) = self.speaker_cancel.take() {
+            token.cancel();
+        }
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        self.clear_speaker();
         self.cancel.cancel();
     }
 }
@@ -123,6 +153,7 @@ async fn speaker_poll_loop(
     tx: mpsc::UnboundedSender<Event>,
     cancel: CancellationToken,
 ) {
+    let ip = client.ip();
     // Subscribe to key state changes
     let paths = [
         api::VOLUME,
@@ -151,7 +182,10 @@ async fn speaker_poll_loop(
                 match client.subscribe(fallback_paths).await {
                     Ok(id) => id,
                     Err(e) => {
-                        let _ = tx.send(Event::SpeakerError(format!("Subscribe failed: {e}")));
+                        let _ = tx.send(Event::SpeakerError {
+                            ip,
+                            message: format!("Subscribe failed: {e}"),
+                        });
                         tokio::select! {
                             () = cancel.cancelled() => return,
                             () = tokio::time::sleep(Duration::from_secs(5)) => continue,
@@ -173,19 +207,30 @@ async fn speaker_poll_loop(
                     // On any event, re-fetch full state for simplicity
                     match client.fetch_full_state().await {
                         Ok(state) => {
-                            if tx.send(Event::SpeakerUpdate(Box::new(state))).is_err() {
+                            if tx
+                                .send(Event::SpeakerUpdate {
+                                    ip,
+                                    state: Box::new(state),
+                                })
+                                .is_err()
+                            {
                                 return;
                             }
                         }
                         Err(e) => {
-                            let _ =
-                                tx.send(Event::SpeakerError(format!("State fetch failed: {e}")));
+                            let _ = tx.send(Event::SpeakerError {
+                                ip,
+                                message: format!("State fetch failed: {e}"),
+                            });
                         }
                     }
                 }
                 Ok(None) => {} // Timeout, no events — just re-poll
                 Err(e) => {
-                    let _ = tx.send(Event::SpeakerError(format!("Poll failed: {e}")));
+                    let _ = tx.send(Event::SpeakerError {
+                        ip,
+                        message: format!("Poll failed: {e}"),
+                    });
                     // Break inner loop to re-subscribe
                     break;
                 }

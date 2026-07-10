@@ -3,12 +3,11 @@ source: src/ui/mod.rs
 expression: buffer_text(&buf)
 ---
 ┏ kefctl ━━━━━━━┓┌ Speaker Info ───────────────────────────────────────────────┐
-┃▸   Status     ┃│  Name      Living Room LSX II                               │
-┃    Source     ┃│  Model     LSX II                                           │
-┃    EQ / DSP   ┃│  Firmware  4.3.1.0240                                       │
-┃    Setti┌ Keybindings ─────────────────────────────────────────────┐         │
-┃    Netwo│  Navigation                                              │         │
-┃         │    Tab / Shift+Tab     Next / previous panel             │         │
+┃    Speakers   ┃│  Name      Living Room LSX II                               │
+┃▸   Status     ┃│  Model     LSX II                                           │
+┃    Sourc┌ Keybindings ─────────────────────────────────────────────┐         │
+┃    EQ / │  Navigation                                              │         │
+┃    Setti│    Tab / Shift+Tab     Next / previous panel             │         │
 ┃         │    j / k  ↓ / ↑        Move down / up                    │         │
 ┃         │    h / ←               Focus sidebar / back              │         │
 ┃         │    l / → / Enter       Focus main panel / select         │         │
@@ -16,9 +15,10 @@ expression: buffer_text(&buf)
 ┃         │                                                          │         │
 ┃         │  Volume                                                  │         │
 ┃         │    + / -               Volume up / down                  │         │
-┃         │    m                   Toggle mute                       │─────────┘
-┃         │                                                          │─────────┐
-┃         │  Panels                                                  │         │
+┃         │    m                   Toggle mute                       │         │
+┃         │                                                          │─────────┘
+┃         │  Panels                                                  │─────────┐
+┃         │    Speakers            j/k navigate, Enter select, r refr│         │
 ┃         │    Status              e to edit speaker name            │         │
 ┃         │    Source              j/k navigate, Enter to switch     │         │
 ┃         │    EQ / DSP            j/k navigate, ◂/▸ adjust values   │         │
@@ -27,8 +27,8 @@ expression: buffer_text(&buf)
 ┃         │  General                                                 │         │
 ┃         │    ?                   Show this help                    │         │
 ┃         │    q / Ctrl+c          Quit                              │         │
+┃         │                                                          │         │
 ┃         └ ? or Esc to close ───────────────────────────────────────┘         │
-┃               ┃│                                                             │
 ┃               ┃│                                                             │
 ┗━━━━━━━━━━━━━━━┛└─────────────────────────────────────────────────────────────┘
  ?  Help │  +/-  vol │  m  mute │  Tab  panel ● Living Room LSX II │ Status

@@ -26,7 +26,7 @@ cp target/release/kefctl ~/.bin/
 ## Usage
 
 ```sh
-# Launch TUI (auto-discovers speaker)
+# Launch TUI (auto-discovers speakers)
 kefctl
 
 # Connect to a specific speaker
@@ -66,8 +66,14 @@ Press `?` in the app for the full keybindings overlay.
 | `+` / `-` | Volume up/down |
 | `m` | Toggle mute |
 | `←` / `→` | Adjust value (EQ/Settings panels) |
+| `Enter` | Select speaker (Speakers panel) |
+| `r` | Refresh speaker discovery (Speakers panel) |
 
 ## Panels
+
+**Speakers** — Select the active speaker from configured and discovered devices. All other panels configure the active speaker.
+
+![Speakers panel](docs/images/05_network_section.png)
 
 **Status** — Speaker info, settings summary. Press `e` to rename the speaker inline.
 
@@ -84,10 +90,6 @@ Press `?` in the app for the full keybindings overlay.
 **Settings** — Standby timeout, max volume, front LED, startup tone, cable mode, wake-up source, app analytics. All rows adjustable with Left/Right.
 
 ![Settings panel](docs/images/04_settings_section.png)
-
-**Network** — Connection status, discovered speakers on the network
-
-![Network panel](docs/images/05_network_section.png)
 
 ## Architecture
 
@@ -135,9 +137,15 @@ Optional config at `~/.config/kefctl/config.toml`:
 
 ```toml
 [speaker]
+default_source = "usb"   # fallback for toggle (usb, wifi, bluetooth, tv, optical, coaxial, analog)
+
+[[speakers]]
+ip = "192.168.50.20"
+name = "Desk"
+
+[[speakers]]
 ip = "192.168.50.17"
 name = "Living Room"
-default_source = "usb"   # fallback for toggle (usb, wifi, bluetooth, tv, optical, coaxial, analog)
 
 [ui]
 refresh_ms = 1000
@@ -149,10 +157,11 @@ The speaker IP is resolved in this order:
 
 1. `--speaker <ip>` flag
 2. `speaker.ip` in config file
-3. Cached IP from last successful connection (`~/.local/state/kefctl/last_speaker`)
-4. mDNS discovery (`_kef-info._tcp.local.`) — uses first KEF speaker found
+3. Cached IP from the last selected speaker (`~/.local/state/kefctl/last_speaker`)
+4. First valid `[[speakers]]` entry
+5. mDNS discovery (`_kef-info._tcp.local.`) — uses the first KEF speaker found
 
-After a successful connection, the speaker IP is cached so subsequent launches skip the 5-second mDNS discovery.
+The TUI merges `[[speakers]]` entries with mDNS results. Select a speaker in the Speakers panel with `j`/`k` and `Enter`; the selection is cached for the next launch. Press `r` to refresh discovery.
 
 ## Themes
 

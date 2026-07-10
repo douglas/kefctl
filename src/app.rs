@@ -24,6 +24,8 @@ pub(crate) enum Action {
     SetWakeUpSource(WakeUpSource),
     SetAppAnalytics(bool),
     SetDeviceName(String),
+    SelectSpeaker(IpAddr),
+    RefreshSpeakers,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -38,11 +40,11 @@ pub(crate) enum Panel {
 
 impl Panel {
     pub(crate) const ALL: &[Panel] = &[
+        Panel::Network,
         Panel::Status,
         Panel::Source,
         Panel::Eq,
         Panel::Settings,
-        Panel::Network,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -51,7 +53,7 @@ impl Panel {
             Panel::Source => "Source",
             Panel::Eq => "EQ / DSP",
             Panel::Settings => "Settings",
-            Panel::Network => "Network",
+            Panel::Network => "Speakers",
         }
     }
 
@@ -64,6 +66,7 @@ impl Panel {
 pub(crate) enum ConnectionState {
     #[default]
     Disconnected,
+    Connecting,
     Connected,
 }
 
@@ -153,7 +156,7 @@ impl SpeakerState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DiscoveredSpeaker {
     pub(crate) name: String,
     pub(crate) ip: IpAddr,
@@ -168,9 +171,12 @@ pub(crate) struct App {
     pub(crate) focus: Focus,
     pub(crate) sidebar_state: ListState,
     pub(crate) source_list_state: ListState,
+    pub(crate) network_list_state: ListState,
     pub(crate) eq_focus: usize,
     pub(crate) settings_focus: usize,
     pub(crate) network_speakers: Vec<DiscoveredSpeaker>,
+    pub(crate) discovery_in_progress: bool,
+    pub(crate) switching_to: Option<IpAddr>,
     pub(crate) notification: Option<String>,
     pub(crate) notification_ttl: u8,
     pub(crate) show_help: bool,
@@ -183,11 +189,18 @@ pub(crate) struct App {
 }
 
 impl App {
-    pub(crate) fn new_live(state: SpeakerState) -> Self {
+    pub(crate) fn new_live(state: SpeakerState, network_speakers: Vec<DiscoveredSpeaker>) -> Self {
         let mut sidebar_state = ListState::default();
-        sidebar_state.select(Some(0));
+        sidebar_state.select(Some(Panel::Status.index()));
         let mut source_list_state = ListState::default();
         source_list_state.select(Some(0));
+        let mut network_list_state = ListState::default();
+        network_list_state.select(
+            network_speakers
+                .iter()
+                .position(|speaker| speaker.ip == state.ip)
+                .or((!network_speakers.is_empty()).then_some(0)),
+        );
 
         Self {
             speaker: state,
@@ -196,9 +209,12 @@ impl App {
             focus: Focus::Sidebar,
             sidebar_state,
             source_list_state,
+            network_list_state,
             eq_focus: 0,
             settings_focus: 0,
-            network_speakers: vec![],
+            network_speakers,
+            discovery_in_progress: true,
+            switching_to: None,
             notification: None,
             notification_ttl: 0,
             show_help: false,
@@ -213,20 +229,30 @@ impl App {
 
     pub(crate) fn new_demo() -> Self {
         let mut sidebar_state = ListState::default();
-        sidebar_state.select(Some(0));
+        sidebar_state.select(Some(Panel::Status.index()));
         let mut source_list_state = ListState::default();
         source_list_state.select(Some(0));
+        let mut network_list_state = ListState::default();
+        network_list_state.select(Some(0));
+        let speaker = SpeakerState::demo();
 
         Self {
-            speaker: SpeakerState::demo(),
+            network_speakers: vec![DiscoveredSpeaker {
+                name: speaker.name.clone(),
+                ip: speaker.ip,
+                port: 80,
+            }],
+            speaker,
             panel: Panel::Status,
             connection: ConnectionState::Connected,
             focus: Focus::Sidebar,
             sidebar_state,
             source_list_state,
+            network_list_state,
             eq_focus: 0,
             settings_focus: 0,
-            network_speakers: vec![],
+            discovery_in_progress: false,
+            switching_to: None,
             notification: None,
             notification_ttl: 0,
             show_help: false,
@@ -242,6 +268,36 @@ impl App {
     pub(crate) fn set_notification(&mut self, msg: String) {
         self.notification = Some(msg);
         self.notification_ttl = 3;
+    }
+
+    pub(crate) fn set_network_speakers(&mut self, mut speakers: Vec<DiscoveredSpeaker>) {
+        let mut known_speakers = self.network_speakers.clone();
+        known_speakers.append(&mut speakers);
+        speakers = known_speakers;
+        if !speakers.iter().any(|speaker| speaker.ip == self.speaker.ip) {
+            speakers.push(DiscoveredSpeaker {
+                name: self.speaker.name.clone(),
+                ip: self.speaker.ip,
+                port: 80,
+            });
+        }
+        speakers.sort_by_key(|speaker| speaker.ip);
+        speakers.dedup_by_key(|speaker| speaker.ip);
+        speakers.sort_by(|a, b| {
+            a.name
+                .to_lowercase()
+                .cmp(&b.name.to_lowercase())
+                .then_with(|| a.ip.cmp(&b.ip))
+        });
+
+        self.network_list_state.select(
+            speakers
+                .iter()
+                .position(|speaker| speaker.ip == self.speaker.ip)
+                .or((!speakers.is_empty()).then_some(0)),
+        );
+        self.network_speakers = speakers;
+        self.discovery_in_progress = false;
     }
 
     pub(crate) fn select_panel(&mut self, panel: Panel) {
@@ -309,6 +365,7 @@ impl App {
                 self.prev_panel();
                 return None;
             }
+            _ if self.switching_to.is_some() => return None,
             // Global playback controls
             KeyCode::Char('m') => {
                 self.speaker.muted = !self.speaker.muted;
@@ -376,13 +433,42 @@ impl App {
                 }
                 None
             }
-            Panel::Network => {
-                if key.code == KeyCode::Char('h') {
-                    self.focus = Focus::Sidebar;
-                }
-                None
-            }
+            Panel::Network => self.handle_key_network(key),
         }
+    }
+
+    fn handle_key_network(&mut self, key: KeyEvent) -> Option<Action> {
+        let count = self.network_speakers.len();
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down if count > 0 => {
+                let i = self.network_list_state.selected().unwrap_or(0);
+                self.network_list_state.select(Some((i + 1) % count));
+            }
+            KeyCode::Char('k') | KeyCode::Up if count > 0 => {
+                let i = self.network_list_state.selected().unwrap_or(0);
+                self.network_list_state
+                    .select(Some(if i == 0 { count - 1 } else { i - 1 }));
+            }
+            KeyCode::Enter => {
+                if let Some(speaker) = self
+                    .network_list_state
+                    .selected()
+                    .and_then(|i| self.network_speakers.get(i))
+                    && speaker.ip != self.speaker.ip
+                {
+                    self.switching_to = Some(speaker.ip);
+                    self.connection = ConnectionState::Connecting;
+                    return Some(Action::SelectSpeaker(speaker.ip));
+                }
+            }
+            KeyCode::Char('r') if !self.discovery_in_progress => {
+                self.discovery_in_progress = true;
+                return Some(Action::RefreshSpeakers);
+            }
+            KeyCode::Char('h') => self.focus = Focus::Sidebar,
+            _ => {}
+        }
+        None
     }
 
     fn handle_key_name_edit(&mut self, key: KeyEvent) -> Option<Action> {
@@ -727,6 +813,93 @@ mod tests {
         assert!(a.notification.is_some());
         a.tick(); // ttl 0 -> cleared
         assert!(a.notification.is_none());
+    }
+
+    // -- Speaker selection --
+
+    fn add_office_speaker(app: &mut App) -> IpAddr {
+        let ip = "192.168.50.20".parse().unwrap();
+        app.set_network_speakers(vec![DiscoveredSpeaker {
+            name: "Office LSX II LT".to_string(),
+            ip,
+            port: 80,
+        }]);
+        ip
+    }
+
+    #[test]
+    fn discovered_speakers_merge_and_select_active_speaker() {
+        let mut a = app();
+        let active_ip = a.speaker.ip;
+        let office_ip = add_office_speaker(&mut a);
+
+        assert_eq!(a.network_speakers.len(), 2);
+        assert!(
+            a.network_speakers
+                .iter()
+                .any(|speaker| speaker.ip == office_ip)
+        );
+        let selected = a.network_list_state.selected().unwrap();
+        assert_eq!(a.network_speakers[selected].ip, active_ip);
+        assert!(!a.discovery_in_progress);
+
+        a.set_network_speakers(vec![DiscoveredSpeaker {
+            name: "mDNS service fullname".to_string(),
+            ip: office_ip,
+            port: 80,
+        }]);
+        assert_eq!(
+            a.network_speakers
+                .iter()
+                .find(|speaker| speaker.ip == office_ip)
+                .unwrap()
+                .name,
+            "Office LSX II LT"
+        );
+    }
+
+    #[test]
+    fn network_panel_selects_another_speaker() {
+        let mut a = app();
+        let office_ip = add_office_speaker(&mut a);
+        a.select_panel(Panel::Network);
+        a.focus = Focus::Main;
+        let office_index = a
+            .network_speakers
+            .iter()
+            .position(|speaker| speaker.ip == office_ip)
+            .unwrap();
+        a.network_list_state.select(Some(office_index));
+
+        let action = a.handle_key(key(KeyCode::Enter));
+
+        assert!(matches!(action, Some(Action::SelectSpeaker(ip)) if ip == office_ip));
+        assert_eq!(a.switching_to, Some(office_ip));
+        assert_eq!(a.connection, ConnectionState::Connecting);
+    }
+
+    #[test]
+    fn network_panel_does_not_reselect_active_speaker() {
+        let mut a = app();
+        a.select_panel(Panel::Network);
+        a.focus = Focus::Main;
+
+        assert!(a.handle_key(key(KeyCode::Enter)).is_none());
+        assert_eq!(a.switching_to, None);
+    }
+
+    #[test]
+    fn network_panel_refreshes_discovery_once() {
+        let mut a = app();
+        a.select_panel(Panel::Network);
+        a.focus = Focus::Main;
+
+        assert!(matches!(
+            a.handle_key(key(KeyCode::Char('r'))),
+            Some(Action::RefreshSpeakers)
+        ));
+        assert!(a.discovery_in_progress);
+        assert!(a.handle_key(key(KeyCode::Char('r'))).is_none());
     }
 
     // -- EQ adjustments --

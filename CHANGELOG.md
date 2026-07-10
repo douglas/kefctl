@@ -2,6 +2,14 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Interactive multi-speaker selection in the Speakers panel, including safe client and event-poller switching.
+- Background mDNS refresh with `r` and support for persistent `[[speakers]]` config entries.
+- The last selected speaker is cached and restored on the next launch.
+
 ## [0.5.1] — 2026-04-16
 
 ### Fixed
