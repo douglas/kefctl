@@ -2,6 +2,14 @@
 
 All notable changes to kefctl will be documented in this file.
 
+## [0.7.0] — 2026-08-15
+
+### Added
+
+- `kefctl panel` emits a JSON snapshot for native desktop panels, including
+  connection state, speaker identity, source, volume, mute, standby, and
+  discovered speakers.
+
 ## [0.6.0] — 2026-07-10
 
 ### Added

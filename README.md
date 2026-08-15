@@ -47,6 +47,7 @@ kefctl mute on               # Mute
 kefctl mute off              # Unmute
 kefctl toggle                # Wake or standby the speaker
 kefctl waybar                # JSON status for waybar module
+kefctl panel                 # JSON snapshot for native desktop panels
 kefctl ip                    # Print the resolved speaker IP address
 ```
 
