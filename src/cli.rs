@@ -52,6 +52,9 @@ pub enum Commands {
     /// Output JSON status for waybar custom module
     Waybar,
 
+    /// Output JSON state for native desktop control panels
+    Panel,
+
     /// Print the speaker's IP address
     Ip,
 }

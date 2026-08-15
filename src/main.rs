@@ -76,6 +76,9 @@ async fn main() {
         Some(Commands::Waybar) => {
             cmd_waybar(speaker_ip).await;
         }
+        Some(Commands::Panel) => {
+            cmd_panel(speaker_ip, &config).await;
+        }
         Some(Commands::Ip) => {
             let ip = resolve_speaker(speaker_ip, configured_ip);
             println!("{ip}");
@@ -659,6 +662,81 @@ async fn cmd_waybar(speaker_ip: Option<&str>) {
     }
 }
 
+/// Output a stable, machine-readable snapshot for desktop panels.
+///
+/// Unlike the human-oriented `status` command, this always returns JSON so a
+/// caller can render an offline state without parsing stderr or exit codes.
+async fn cmd_panel(speaker_ip: Option<&str>, config: &Config) {
+    let mut speakers = configured_speakers(config);
+    let Some(ip) = resolve_waybar_ip(speaker_ip) else {
+        print_panel_json(None, &speakers, Some("No configured KEF speaker"));
+        return;
+    };
+
+    let kef = KefClient::new(ip);
+    match kef.fetch_full_state().await {
+        Ok(state) => {
+            if !speakers.iter().any(|speaker| speaker.ip == state.ip) {
+                speakers.push(DiscoveredSpeaker {
+                    name: state.name.clone(),
+                    ip: state.ip,
+                    port: 80,
+                });
+            }
+            print_panel_json(Some(&state), &speakers, None);
+        }
+        Err(error) => {
+            tracing::debug!("Panel: speaker unreachable: {error}");
+            print_panel_json(None, &speakers, Some("KEF speaker is offline"));
+        }
+    }
+}
+
+fn print_panel_json(
+    state: Option<&app::SpeakerState>,
+    speakers: &[DiscoveredSpeaker],
+    error: Option<&str>,
+) {
+    println!("{}", panel_json(state, speakers, error));
+}
+
+fn panel_json(
+    state: Option<&app::SpeakerState>,
+    speakers: &[DiscoveredSpeaker],
+    error: Option<&str>,
+) -> serde_json::Value {
+    let speaker_list: Vec<_> = speakers
+        .iter()
+        .map(|speaker| {
+            serde_json::json!({
+                "name": speaker.name,
+                "ip": speaker.ip.to_string(),
+            })
+        })
+        .collect();
+
+    match state {
+        Some(state) => serde_json::json!({
+            "connected": true,
+            "name": state.name,
+            "model": state.model,
+            "ip": state.ip.to_string(),
+            "source": state.source.serde_name(),
+            "sourceLabel": state.source.display_name(),
+            "standby": state.source == Source::Standby,
+            "volume": state.volume,
+            "muted": state.muted,
+            "maxVolume": state.max_volume,
+            "speakers": speaker_list,
+        }),
+        None => serde_json::json!({
+            "connected": false,
+            "error": error.unwrap_or("KEF speaker is offline"),
+            "speakers": speaker_list,
+        }),
+    }
+}
+
 fn print_waybar_json(text: &str, tooltip: &str, class: &str) {
     let obj = serde_json::json!({
         "text": text,
@@ -730,5 +808,22 @@ mod tests {
         .unwrap();
 
         assert!(configured_speakers(&config).is_empty());
+    }
+
+    #[test]
+    fn panel_json_includes_configured_speakers_when_offline() {
+        let config = Config::load_from_str(
+            r#"
+                [[speakers]]
+                ip = "192.168.50.20"
+                name = "Desk"
+            "#,
+        )
+        .unwrap();
+        let speakers = configured_speakers(&config);
+        let json = panel_json(None, &speakers, Some("KEF speaker is offline"));
+
+        assert_eq!(json["speakers"][0]["name"], "Desk");
+        assert_eq!(json["speakers"][0]["ip"], "192.168.50.20");
     }
 }
